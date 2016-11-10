@@ -239,6 +239,8 @@ protected:
 
     RowBase(const RowBase& source, HandoverPatch& patch);
 
+    void get_most_derrived_row();
+
 public:
     static void generate_patch(const RowBase& source, HandoverPatch& patch);
     void apply_patch(HandoverPatch& patch, Group& group);
@@ -303,6 +305,8 @@ public:
     BasicRow& operator=(const BasicRow<T>&) noexcept;
 
     ~BasicRow() noexcept;
+
+    using RowBase::get_most_derrived_row;
 
 private:
     T* impl_get_table() const noexcept;

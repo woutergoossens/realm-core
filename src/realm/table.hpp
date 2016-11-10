@@ -541,6 +541,7 @@ public:
     void clear_subtable(size_t column_ndx, size_t row_ndx);
 
     // Backlinks
+    std::pair<Table*, size_t> get_descendant_row(size_t row_ndx) const noexcept;
     size_t get_backlink_count(size_t row_ndx, const Table& origin, size_t origin_col_ndx) const noexcept;
     size_t get_backlink(size_t row_ndx, const Table& origin, size_t origin_col_ndx, size_t backlink_ndx) const
         noexcept;
@@ -914,6 +915,7 @@ private:
     // Group::advance_transact().
     typedef std::vector<ColumnBase*> column_accessors;
     column_accessors m_cols;
+    std::vector<size_t> m_descendants;
 
     mutable std::atomic<size_t> m_ref_count;
 

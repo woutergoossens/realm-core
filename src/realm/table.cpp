@@ -300,6 +300,20 @@ size_t Table::get_backlink_count(size_t row_ndx, const Table& origin, size_t ori
     return backlink_col.get_backlink_count(row_ndx);
 }
 
+std::pair<Table*, size_t> Table::get_descendant_row(size_t row_ndx) const noexcept
+{
+    for (auto& col_ndx : m_descendants) {
+        const BacklinkColumn& backlink_col = get_column_backlink(col_ndx);
+        size_t back_link = backlink_col.get_backlink(row_ndx, 0);
+        if (back_link != npos) {
+            size_t origin_table_ndx = m_spec.get_opposite_link_table_ndx(col_ndx);
+            auto table = get_parent_group()->get_table(origin_table_ndx);
+            return std::make_pair(table.get(), back_link);
+        }
+    }
+
+    return {};
+}
 
 size_t Table::get_backlink(size_t row_ndx, const Table& origin, size_t origin_col_ndx, size_t backlink_ndx) const
     noexcept
@@ -5882,6 +5896,10 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
                 Table& origin_table = gf::get_table(group, origin_table_ndx); // Throws
                 if (!origin_table.is_marked() || &origin_table == this) {
                     size_t link_col_ndx = m_spec.get_origin_column_ndx(col_ndx);
+                    std::string name = origin_table.get_column_name(link_col_ndx);
+                    if (name.substr(0, 9) == std::string("_inherits")) {
+                        m_descendants.push_back(col_ndx);
+                    }
                     origin_table.connect_opposite_link_columns(link_col_ndx, *this, col_ndx);
                 }
             }

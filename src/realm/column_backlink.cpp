@@ -77,22 +77,22 @@ size_t BacklinkColumn::get_backlink_count(size_t row_ndx) const noexcept
 
 size_t BacklinkColumn::get_backlink(size_t row_ndx, size_t backlink_ndx) const noexcept
 {
+    size_t origin_row_ndx = npos;
     uint64_t value = IntegerColumn::get_uint(row_ndx);
-    REALM_ASSERT_3(value, !=, 0);
-
-    size_t origin_row_ndx;
-    if ((value & 1) != 0) {
-        REALM_ASSERT_3(backlink_ndx, ==, 0);
-        origin_row_ndx = to_size_t(value >> 1);
-    }
-    else {
-        ref_type ref = to_ref(value);
-        REALM_ASSERT_3(backlink_ndx, <, ColumnBase::get_size_from_ref(ref, get_alloc()));
-        // FIXME: Optimize with direct access (that is, avoid creation of a
-        // Column instance, since that implies dynamic allocation).
-        IntegerColumn backlink_list(get_alloc(), ref); // Throws
-        uint64_t value_2 = backlink_list.get_uint(backlink_ndx);
-        origin_row_ndx = to_size_t(value_2);
+    if (value != 0) {
+        if ((value & 1) != 0) {
+            REALM_ASSERT_3(backlink_ndx, ==, 0);
+            origin_row_ndx = to_size_t(value >> 1);
+        }
+        else {
+            ref_type ref = to_ref(value);
+            REALM_ASSERT_3(backlink_ndx, <, ColumnBase::get_size_from_ref(ref, get_alloc()));
+            // FIXME: Optimize with direct access (that is, avoid creation of a
+            // Column instance, since that implies dynamic allocation).
+            IntegerColumn backlink_list(get_alloc(), ref); // Throws
+            uint64_t value_2 = backlink_list.get_uint(backlink_ndx);
+            origin_row_ndx = to_size_t(value_2);
+        }
     }
     return origin_row_ndx;
 }
