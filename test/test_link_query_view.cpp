@@ -1300,7 +1300,7 @@ TEST(Link_FindNullLink)
     TableRef table1 = group.add_table("table1");
     TableRef table2 = group.add_table("table2");
 
-    table0->add_column(type_String, "str1");
+    size_t col_str1 = table0->add_column(type_String, "str1");
     table0->add_empty_row();
     table0->set_string(0, 0, "hello");
 
@@ -1319,7 +1319,7 @@ TEST(Link_FindNullLink)
     table1->set_int(0, 2, 300);
     table1->set_string(1, 2, "bar");
 
-    size_t col_link1 = table1->add_column_link(type_Link, "link", *table1);
+    size_t col_link1 = table1->add_column_link(type_Link, "link", *table0);
     table1->set_link(col_link1, 0, 0);
     table1->set_link(col_link1, 2, 0);
 
@@ -1338,7 +1338,7 @@ TEST(Link_FindNullLink)
     lvr = table2->get_linklist(col_linklist2, 0);
     lvr->add(0);
     lvr->add(1);
-    lvr = table2->get_linklist(col_linklist2, 2);
+    lvr = table2->get_linklist(col_linklist2, 3);
     lvr->add(0);
 
     /*
@@ -1348,8 +1348,8 @@ TEST(Link_FindNullLink)
         Row   LinkCol  LinkListCol       Row   Link
         0     1        {0, 1}            0     0
         1     null     {}                1     null
-        2     2        {0}               2     0
-        3     null     {}
+        2     2        {}                2     0
+        3     null     {0}
     */
 
     // Find all non-null links on Link
@@ -1360,13 +1360,13 @@ TEST(Link_FindNullLink)
     CHECK_EQUAL(2, tv5.get_source_ndx(1));
 
     // Find all non-null links on LinkList
-    Query q6 = table2->column<LinkList>(col_link2).is_not_null();
+    Query q6 = table2->column<LinkList>(col_linklist2).is_not_null();
     TableView tv6 = q6.find_all();
     CHECK_EQUAL(2, tv6.size());
     CHECK_EQUAL(0, tv6.get_source_ndx(0));
-    CHECK_EQUAL(2, tv6.get_source_ndx(1));
+    CHECK_EQUAL(3, tv6.get_source_ndx(1));
 
-    // Test find_all on Link
+    // Test find_all null links on Link
     Query q3 = table2->column<Link>(col_link2).is_null();
     TableView tv = q3.find_all();
     CHECK_EQUAL(2, tv.size());
@@ -1384,16 +1384,42 @@ TEST(Link_FindNullLink)
     TableView tv2 = q4.find_all();
     CHECK_EQUAL(2, tv2.size());
     CHECK_EQUAL(1, tv2.get_source_ndx(0));
-    CHECK_EQUAL(3, tv2.get_source_ndx(1));
+    CHECK_EQUAL(2, tv2.get_source_ndx(1));
 
     // Test find() on LinkList
     match = table2->column<LinkList>(col_linklist2).is_null().find();
     CHECK_EQUAL(1, match);
     match = table2->column<LinkList>(col_linklist2).is_null().find(2);
-    CHECK_EQUAL(3, match);
+    CHECK_EQUAL(2, match);
 
-    // We have not yet defined behaviour of finding realm::null()-links in a linked-to table, so we just throw. Todo.
-    CHECK_THROW_ANY(table2->link(col_linklist2).column<Link>(col_link1).is_null());
+    table2->link(col_linklist2);
+    table2->link(col_link1);
+    Query q1 = table2->column<String>(col_str1).equal(StringData("hello"));
+    TableView tv1 = q1.find_all();
+    CHECK_EQUAL(2, tv1.size());
+    CHECK_EQUAL(0, tv1.get_source_ndx(0));
+    CHECK_EQUAL(3, tv1.get_source_ndx(1));
+
+    // Test is_null and is_not_null over links
+    auto c = table2->link(col_link2).column<Link>(col_link1);
+    q1 = c.is_null();
+    tv1 = q1.find_all();
+    CHECK_EQUAL(1, tv1.size());
+    CHECK_EQUAL(0, tv1.get_source_ndx(0));
+    q1 = c.is_not_null();
+    tv1 = q1.find_all();
+    CHECK_EQUAL(1, tv1.size());
+    CHECK_EQUAL(2, tv1.get_source_ndx(0));
+
+    c = table2->link(col_linklist2).column<Link>(col_link1);
+    q1 = c.is_null();
+    tv1 = q1.find_all();
+    CHECK_EQUAL(0, tv1.size());
+    q1 = c.is_not_null();
+    tv1 = q1.find_all();
+    CHECK_EQUAL(2, tv1.size());
+    CHECK_EQUAL(0, tv1.get_source_ndx(0));
+    CHECK_EQUAL(3, tv1.get_source_ndx(1));
 }
 
 

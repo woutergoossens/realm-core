@@ -1556,6 +1556,17 @@ struct LinkMapFunction {
     // for the current main table row index (it will be a link tree if you have multiple type_LinkList columns
     // in a link()->link() query.
     virtual bool consume(size_t row_index) = 0;
+    void set_valid()
+    {
+        m_valid = true;
+    }
+    bool is_valid()
+    {
+        return m_valid;
+    }
+
+private:
+    bool m_valid = false;
 };
 
 struct FindNullLinks : public LinkMapFunction {
@@ -1718,6 +1729,9 @@ private:
     void map_links(size_t column, size_t row, LinkMapFunction& lm)
     {
         bool last = (column + 1 == m_link_columns.size());
+        if (last) {
+            lm.set_valid();
+        }
         ColumnType type = m_link_types[column];
         if (type == col_type_Link) {
             const LinkColumn& cl = *static_cast<const LinkColumn*>(m_link_columns[column]);
@@ -2072,12 +2086,9 @@ public:
     size_t find_first(size_t start, size_t end) const override
     {
         for (; start < end;) {
-            std::vector<size_t> l = m_link_map.get_links(start);
-            // We have found a Link which is NULL, or LinkList with 0 entries. Return it as match.
-
             FindNullLinks fnl;
             m_link_map.map_links(start, fnl);
-            if (fnl.m_has_link == has_links)
+            if (fnl.is_valid() && (fnl.m_has_link == has_links))
                 return start;
 
             start++;
@@ -2210,17 +2221,11 @@ class Columns<Link> : public Subexpr2<Link> {
 public:
     Query is_null()
     {
-        if (m_link_map.m_link_columns.size() > 1)
-            throw std::runtime_error("Combining link() and is_null() is currently not supported");
-        // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
         return make_expression<UnaryLinkCompare<false>>(m_link_map);
     }
 
     Query is_not_null()
     {
-        if (m_link_map.m_link_columns.size() > 1)
-            throw std::runtime_error("Combining link() and is_not_null() is currently not supported");
-        // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
         return make_expression<UnaryLinkCompare<true>>(m_link_map);
     }
 
