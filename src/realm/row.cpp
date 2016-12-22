@@ -71,16 +71,3 @@ void RowBase::apply_patch(HandoverPatch& patch, Group& group)
         m_table->register_row_accessor(this);
     m_row_ndx = patch.row_ndx;
 }
-
-void RowBase::get_most_derrived_row()
-{
-    Table* new_table = m_table.get();
-    size_t new_row = m_row_ndx;
-    auto back_link_target = new_table->get_descendant_row(new_row);
-    while (back_link_target.first) {
-        new_table = back_link_target.first;
-        new_row = back_link_target.second;
-        back_link_target = new_table->get_descendant_row(new_row);
-    }
-    reattach(new_table, new_row);
-}

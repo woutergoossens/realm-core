@@ -881,6 +881,11 @@ void Table::insert_root_column(size_t col_ndx, DataType type, StringData name, L
     }
 
     refresh_link_target_accessors(col_ndx);
+
+    // Adjust the descendants column indexes
+    for (size_t& col : m_descendants) {
+        col++;
+    }
 }
 
 
@@ -953,6 +958,7 @@ void Table::do_erase_root_column(size_t ndx)
         Array::destroy_deep(index_ref, m_columns.get_alloc());
         m_columns.erase(ndx_in_parent);
     }
+    adjust_erase_descendants(ndx);
 }
 
 
@@ -1017,7 +1023,6 @@ void Table::insert_backlink_column(size_t origin_table_ndx, size_t origin_col_nd
     m_spec.set_backlink_origin_column(backlink_col_ndx, origin_col_ndx);    // Throws
     refresh_column_accessors(backlink_col_ndx);                             // Throws
 }
-
 
 void Table::erase_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx)
 {
@@ -2783,9 +2788,11 @@ double Table::get(size_t col_ndx, size_t ndx) const noexcept
 template <>
 StringData Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
-    REALM_ASSERT_3(col_ndx, <, m_columns.size());
-    REALM_ASSERT_7(get_real_column_type(col_ndx), ==, col_type_String, ||, get_real_column_type(col_ndx), ==,
-                   col_type_StringEnum);
+    /*
+        REALM_ASSERT_3(col_ndx, <, m_columns.size());
+        REALM_ASSERT_7(get_real_column_type(col_ndx), ==, col_type_String, ||, get_real_column_type(col_ndx), ==,
+                       col_type_StringEnum);
+    */
     REALM_ASSERT_3(ndx, <, m_size);
 
     StringData sd;
@@ -2894,7 +2901,13 @@ size_t Table::do_set_unique(ColType& col, size_t ndx, T&& value, bool& conflict)
 
 int64_t Table::get_int(size_t col_ndx, size_t ndx) const noexcept
 {
-    return get<int64_t>(col_ndx, ndx);
+    auto col_cnt = get_column_count();
+    if (col_ndx < col_cnt) {
+        return get<int64_t>(col_ndx, ndx);
+    }
+    else {
+        return m_super->get_int(col_ndx - col_cnt, this->get_link(m_super_link_col, ndx));
+    }
 }
 
 size_t Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
@@ -3109,7 +3122,13 @@ void Table::set_double(size_t col_ndx, size_t ndx, double value, bool is_default
 
 StringData Table::get_string(size_t col_ndx, size_t ndx) const noexcept
 {
-    return get<StringData>(col_ndx, ndx);
+    auto col_cnt = get_column_count();
+    if (col_ndx < col_cnt) {
+        return get<StringData>(col_ndx, ndx);
+    }
+    else {
+        return m_super->get_string(col_ndx - col_cnt, this->get_link(m_super_link_col, ndx));
+    }
 }
 
 
@@ -5734,6 +5753,21 @@ void Table::adj_move_column(size_t from, size_t to) noexcept
     }
 }
 
+void Table::adjust_erase_descendants(size_t ndx)
+{
+    auto it = m_descendants.begin();
+    while (it != m_descendants.end()) {
+        if (*it == ndx) {
+            it = m_descendants.erase(it);
+        }
+        else {
+            if (*it > ndx) {
+                --*it;
+            }
+            ++it;
+        }
+    }
+}
 
 void Table::recursive_mark() noexcept
 {
@@ -5889,6 +5923,12 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
                     size_t backlink_col_ndx = target_table.m_spec.find_backlink_column(origin_ndx_in_group, col_ndx);
                     connect_opposite_link_columns(col_ndx, target_table, backlink_col_ndx);
                 }
+                std::string name = get_column_name(col_ndx);
+                if (name.substr(0, 6) == std::string("_super")) {
+                    REALM_ASSERT(!m_super);
+                    m_super = &target_table;
+                    m_super_link_col = col_ndx;
+                }
             }
             else if (col_type == col_type_BackLink) {
                 Group& group = *get_parent_group();
@@ -5897,7 +5937,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
                 if (!origin_table.is_marked() || &origin_table == this) {
                     size_t link_col_ndx = m_spec.get_origin_column_ndx(col_ndx);
                     std::string name = origin_table.get_column_name(link_col_ndx);
-                    if (name.substr(0, 9) == std::string("_inherits")) {
+                    if (name.substr(0, 6) == std::string("_super")) {
                         m_descendants.push_back(col_ndx);
                     }
                     origin_table.connect_opposite_link_columns(link_col_ndx, *this, col_ndx);

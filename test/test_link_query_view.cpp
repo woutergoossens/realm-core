@@ -158,48 +158,42 @@ private:
     unsigned long long start_val;
 };
 
-ONLY(LinkList_Inheritance)
+struct Dog {
+    std::string name;
+    int age;
+    int id;
+    std::string color;
+};
+
+Dog my_dog;
+
+TEST(LinkList_Inheritance)
 {
     const char* dog_names[] = {"Fido", "Hector", "Balder", "Tago", "Thor", "Basse", "Skipper"};
     const char* dog_colors[] = {"black", "red", "white", "brown", "yellow"};
     Group group;
 
-    struct Dog {
-        std::string name;
-        int age;
-        int id;
-        std::string color;
-    };
-
-    unsigned cats = 0;
-    unsigned dogs = 0;
+    TableRef person = group.add_table("Person");
     TableRef animal = group.add_table("Animal");
     TableRef dog = group.add_table("Dog");
     TableRef cat = group.add_table("Cat");
-    TableRef dog1 = group.add_table("Dog1");
-    TableRef cat1 = group.add_table("Cat1");
 
-    // add some more columns to animal, dog and cat
+    person->add_column(type_String, "Name");
+
     size_t age_col = animal->add_column(type_Int, "Age");
     size_t name_col = animal->add_column(type_String, "Name");
+    size_t owner_col = animal->add_column_link(type_Link, "Owner", *person);
 
-    size_t inherit_link_dog = dog->add_column_link(type_Link, "_inherits", *animal, link_Strong);
+    // add some more columns to animal, dog and cat
+    size_t inherit_link_dog = dog->add_column_link(type_Link, "_super", *animal, link_Strong);
     size_t id_col = dog->add_column(type_Int, "Id");
     size_t color_col_dog = dog->add_column(type_String, "Color");
+    size_t age_col_dog = age_col + 3;
+    size_t name_col_dog = name_col + 3;
 
-    size_t age_col_dog1 = dog1->add_column(type_Int, "Age");
-    size_t name_col_dog1 = dog1->add_column(type_String, "Name");
-    size_t id_col_dog1 = dog1->add_column(type_Int, "Id");
-    size_t color_col_dog1 = dog1->add_column(type_String, "Color");
-
-    size_t inherit_link_cat = cat->add_column_link(type_Link, "_inherits", *animal, link_Strong);
+    size_t inherit_link_cat = cat->add_column_link(type_Link, "_super", *animal, link_Strong);
     size_t puppy_col = cat->add_column(type_Int, "Puppy");
     size_t color_col_cat = cat->add_column(type_String, "Color");
-
-    size_t age_col_cat1 = cat1->add_column(type_Int, "Age");
-    size_t name_col_cat1 = cat1->add_column(type_String, "Name");
-    size_t puppy_col_cat1 = cat1->add_column(type_Int, "Puppy");
-    size_t color_col_cat1 = cat1->add_column(type_String, "Color");
 
     auto add_animal = [&](std::string name, int age) {
         size_t animal_row = animal->add_empty_row();
@@ -207,6 +201,7 @@ ONLY(LinkList_Inheritance)
         animal->set_string(name_col, animal_row, name);
         return animal_row;
     };
+
     auto add_dog = [&](std::string name, int age, int id, std::string color) {
         size_t animal_row = add_animal(name, age);
         size_t dog_row = dog->add_empty_row();
@@ -214,19 +209,13 @@ ONLY(LinkList_Inheritance)
         dog->set_string(color_col_dog, dog_row, color);
         dog->set_int(id_col, dog_row, id);
     };
-    auto get_dog = [&](size_t row, Dog& ret) {
-        ret.color = dog->get_string(color_col_dog, row);
-        ret.id = dog->get_int(id_col, row);
-        size_t animal_row = dog->get_link(inherit_link_dog, row);
-        ret.name = animal->get_string(name_col, animal_row);
-        ret.age = animal->get_int(age_col, animal_row);
 
-    };
-    auto get_dog1 = [&](size_t row, Dog& ret) {
-        ret.color = dog1->get_string(color_col_dog1, row);
-        ret.id = dog1->get_int(id_col_dog1, row);
-        ret.name = dog1->get_string(name_col_dog1, row);
-        ret.age = dog1->get_int(age_col_dog1, row);
+    auto get_dog = [&](Row row, Dog& ret) {
+        ret.color = row.get_string(color_col_dog);
+        ret.id = row.get_int(id_col);
+        // Row animal_row = animal->get(row.get_link(inherit_link_dog));
+        ret.name = row.get_string(name_col_dog);
+        ret.age = row.get_int(age_col_dog);
 
     };
     auto add_cat = [&](std::string name, int age, int puppies, std::string color) {
@@ -236,133 +225,70 @@ ONLY(LinkList_Inheritance)
         cat->set_string(color_col_cat, cat_row, color);
         cat->set_int(puppy_col, cat_row, puppies);
     };
-    auto add_dog1 = [&](std::string name, int age, int id, std::string color) {
-        size_t dog_row = dog1->add_empty_row();
-        dog1->set_int(age_col_dog1, dog_row, age);
-        dog1->set_string(name_col_dog1, dog_row, name);
-        dog1->set_string(color_col_dog1, dog_row, color);
-        dog1->set_int(id_col_dog1, dog_row, id);
-    };
     // add some rows
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 10; i++) {
         add_dog(dog_names[i % 7], i % 11, i, dog_colors[i % 5]);
     }
     add_cat("Luigi", 2, 0, "red");
     add_cat("Duchess", 1, 3, "orange");
-
-    for (int i = 0; i < 100; i++) {
-        add_dog1(dog_names[i % 7], i % 11, i, dog_colors[i % 5]);
-    }
+    size_t one_person = person->add_empty_row();
+    animal->set_link(owner_col, 2, one_person);
 
     Query q;
     TableView tv;
-    for (int i = 0; i < 10; i++) {
-        RdtscTime t1("Search for age");
-        q = animal->column<Int>(age_col) == 1;
-        tv = q.find_all();
-        for (size_t i = 0; i < tv.size(); i++) {
-            Row r = tv[i];
-            r.get_most_derrived_row();
-            if (r.get_table() == dog.get()) {
-                dogs++;
-            }
-            if (r.get_table() == cat.get()) {
-                cats++;
-            }
-        }
-    }
-    CHECK_EQUAL(tv.size(), 10);
-    CHECK_EQUAL(tv[0].get_index(), 1);
-    CHECK_EQUAL(tv[1].get_index(), 12);
-    CHECK_EQUAL(tv[2].get_index(), 23);
-    CHECK_EQUAL(tv[9].get_index(), 101);
+    q = animal->column<Int>(age_col) == 1;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv[0].get_index(), 1);  // "Hector"
+    CHECK_EQUAL(tv[1].get_index(), 11); // "Duchess"
     CHECK_EQUAL(animal->get_backlink_count(0, *dog, inherit_link_dog), 1);
-    Row a_dog = tv[2];
-    a_dog.get_most_derrived_row();
+
+    // Check that you can downcast to a dog
+    Row a_dog = tv[0];
     CHECK_EQUAL(a_dog.get_table(), dog.get());
-    Row a_cat = tv[9];
-    a_cat.get_most_derrived_row();
+    Dog hector;
+    get_dog(a_dog, hector);
+    CHECK_EQUAL(hector.name, "Hector");
+
+    // And to a cat
+    Row a_cat = tv[1];
     CHECK_EQUAL(a_cat.get_table(), cat.get());
     CHECK_EQUAL(a_cat.get_index(), 1);
-    size_t animal_row = a_cat.get_link(inherit_link_cat);
-    cat->move_last_over(0);
-    CHECK_EQUAL(a_cat.get_index(), 0);
-    animal_row = a_cat.get_link(inherit_link_cat);
 
-    Query q_d;
-    Query q_c;
-    TableView tv_d;
-    TableView tv_c;
-    for (int i = 0; i < 10; i++) {
-        RdtscTime t1("Split search for age");
-        q_d = dog1->column<Int>(age_col_dog1) == 1;
-        q_c = cat1->column<Int>(age_col_cat1) == 1;
-        tv_d = q_d.find_all();
-        for (size_t i = 0; i < tv_d.size(); i++) {
-            Row r = tv_d[i];
-            if (r.is_attached()) {
-                dogs++;
-            }
-        }
-        tv_c = q_c.find_all();
-        for (size_t i = 0; i < tv_c.size(); i++) {
-            Row r = tv_c[i];
-            if (r.is_attached()) {
-                cats++;
-            }
-        }
-    }
+    // Deleting a dog should remove rows in both dog and animal tables
+    dog->move_last_over(0);
+    CHECK_EQUAL(a_dog.get_index(), 1);
+    CHECK_EQUAL(dog->size(), 9);
+    CHECK_EQUAL(animal->size(), 11);
 
     q = dog->link(inherit_link_dog).column<Int>(age_col) == 1;
     tv = q.find_all();
-    CHECK_EQUAL(tv.size(), 9);
+    CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv[0].get_index(), 1);
-    CHECK_EQUAL(tv[1].get_index(), 12);
 
     q = dog->column<String>(color_col_dog) == "brown";
     tv = q.find_all();
-    CHECK_EQUAL(tv.size(), 20);
+    CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(tv[0].get_index(), 3);
     CHECK_EQUAL(tv[1].get_index(), 8);
 
     q = dog->column<String>(color_col_dog) == "brown";
-    q = q && dog->link(inherit_link_dog).column<Int>(age_col) == 1;
+    q = q && dog->link(inherit_link_dog).column<Int>(age_col) == 3;
     tv = q.find_all();
-    CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv[0].get_index(), 23);
-    CHECK_EQUAL(tv[1].get_index(), 78);
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv[0].get_index(), 3);
 
     q = (dog->link(inherit_link_dog).column<Int>(age_col) > 2 &&
          dog->link(inherit_link_dog).column<Int>(age_col) < 8);
     tv = q.find_all();
-    CHECK_EQUAL(tv.size(), 50);
+    CHECK_EQUAL(tv.size(), 5);
     SortDescriptor sd(*dog.get(), {{inherit_link_dog, name_col}}, {true});
     tv.sort(sd);
-    for (int i = 0; i < tv.size(); i++) {
+    for (unsigned i = 0; i < tv.size(); i++) {
         auto link = tv[i].get_link(inherit_link_dog);
         StringData name = animal->get_string(name_col, link);
         std::cout << std::string(name) << std::endl;
     }
-
-    for (int i = 0; i < 10; i++) {
-        RdtscTime t1("Search for age and color");
-        q = dog->where();
-        q.equal(color_col_dog, "brown");
-        dog->link(inherit_link_dog);
-        q.and_query(dog->column<Int>(age_col) == 5);
-        tv = q.find_all();
-    }
-    CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv[0].get_index(), 23);
-    for (int i = 0; i < 10; i++) {
-        RdtscTime t1("Split Search for age and color");
-        q = dog1->where();
-        q.equal(color_col_dog1, "brown");
-        q.and_query(dog1->column<Int>(age_col_dog1) == 5);
-        Query q2 = q;
-        tv = q.find_all();
-    }
-    CHECK_EQUAL(tv.size(), 2);
 
     auto c1 = dog->column<Int>(id_col);
     dog->link(inherit_link_dog);
@@ -370,8 +296,15 @@ ONLY(LinkList_Inheritance)
     Query q1 = c1 == c2;
 
     tv = q1.find_all();
-    CHECK_EQUAL(tv.size(), 11);
+    CHECK_EQUAL(tv.size(), 9);
     CHECK_EQUAL(tv[0].get_index(), 0);
+
+    dog->link(inherit_link_dog);
+    auto c3 = dog->column<Link>(owner_col);
+    Query q2 = c3.is_null();
+
+    tv = q2.find_all();
+    CHECK_EQUAL(tv.size(), 8);
 }
 
 

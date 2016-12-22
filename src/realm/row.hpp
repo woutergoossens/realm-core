@@ -200,6 +200,8 @@ private:
     size_t impl_get_row_ndx() const noexcept;
     void impl_detach() noexcept;
 
+    void get_most_derrived_row();
+
     // Make impl_get_table(), impl_get_row_ndx(), and impl_detach() accessible
     // from RowFuncs.
     friend class RowFuncs<T, BasicRowExpr<T>>;
@@ -238,8 +240,6 @@ protected:
     using HandoverPatch = RowBaseHandoverPatch;
 
     RowBase(const RowBase& source, HandoverPatch& patch);
-
-    void get_most_derrived_row();
 
 public:
     static void generate_patch(const RowBase& source, HandoverPatch& patch);
@@ -305,8 +305,6 @@ public:
     BasicRow& operator=(const BasicRow<T>&) noexcept;
 
     ~BasicRow() noexcept;
-
-    using RowBase::get_most_derrived_row;
 
 private:
     T* impl_get_table() const noexcept;
@@ -745,6 +743,19 @@ inline void BasicRowExpr<T>::impl_detach() noexcept
     m_table = nullptr;
 }
 
+template <class T>
+inline void BasicRowExpr<T>::get_most_derrived_row()
+{
+    for (;;) {
+        auto back_link_target = m_table->get_descendant_row(m_row_ndx);
+        if (!back_link_target.first) {
+            return;
+        }
+        m_table = back_link_target.first;
+        m_row_ndx = back_link_target.second;
+    }
+}
+
 
 template <class T>
 inline BasicRow<T>::BasicRow() noexcept
@@ -762,6 +773,7 @@ template <class T>
 template <class U>
 inline BasicRow<T>::BasicRow(BasicRowExpr<U> expr) noexcept
 {
+    expr.get_most_derrived_row();
     T* expr_table = expr.m_table; // Check that pointer types are compatible
     attach(const_cast<Table*>(expr_table), expr.m_row_ndx);
 }
@@ -778,6 +790,7 @@ template <class T>
 template <class U>
 inline BasicRow<T>& BasicRow<T>::operator=(BasicRowExpr<U> expr) noexcept
 {
+    expr.get_most_derrived_row();
     T* expr_table = expr.m_table; // Check that pointer types are compatible
     reattach(const_cast<Table*>(expr_table), expr.m_row_ndx);
     return *this;

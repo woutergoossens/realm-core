@@ -916,6 +916,8 @@ private:
     typedef std::vector<ColumnBase*> column_accessors;
     column_accessors m_cols;
     std::vector<size_t> m_descendants;
+    Table* m_super = nullptr;
+    size_t m_super_link_col = 0;
 
     mutable std::atomic<size_t> m_ref_count;
 
@@ -1371,6 +1373,7 @@ private:
     void adj_insert_column(size_t col_ndx);
     void adj_erase_column(size_t col_ndx) noexcept;
     void adj_move_column(size_t col_ndx_1, size_t col_ndx_2) noexcept;
+    void adjust_erase_descendants(size_t ndx);
 
     bool is_marked() const noexcept;
     void mark() noexcept;
