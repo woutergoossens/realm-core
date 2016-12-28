@@ -1217,6 +1217,20 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
 {
     TableView ret(*m_table, *this, start, end, limit);
     find_all(ret, start, end, limit);
+    auto table_ref = this->get_table();
+    if (table_ref->m_subclass_tables.size() > 0) {
+        ret.prepare_merge();
+        auto group = table_ref->get_parent_group();
+        for (auto t : table_ref->m_subclass_tables) {
+            TableView tmp(*t, *this, start, end, limit);
+            std::unique_ptr<QueryHandoverPatch> patch;
+            auto dog_clone = clone_for_handover(patch, ConstSourcePayload::Stay);
+            patch->m_table->m_table_num = t->get_index_in_group();
+            dog_clone->apply_patch(*patch.get(), *group);
+            dog_clone->find_all(tmp, start, end, limit);
+            ret.merge(tmp);
+        }
+    }
     return ret;
 }
 

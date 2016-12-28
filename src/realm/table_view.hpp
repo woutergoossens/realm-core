@@ -314,6 +314,21 @@ public:
     virtual ~TableViewBase() noexcept;
 
     virtual std::unique_ptr<TableViewBase> clone() const = 0;
+    void prepare_merge()
+    {
+        m_tables.push_back(m_table);
+    }
+
+    void merge(const TableViewBase& other)
+    {
+        size_t t_idx = m_tables.size();
+        m_tables.push_back(other.m_table);
+        size_t sz = other.size();
+        for (size_t i = 0; i < sz; i++) {
+            m_row_indexes.add(other.get_source_ndx(i));
+        }
+        m_table_idxs.resize(sz, t_idx);
+    }
 
 protected:
     // This TableView can be "born" from 5 different sources:
@@ -329,6 +344,8 @@ protected:
 
     // Null if, and only if, the view is detached.
     mutable TableRef m_table;
+    std::vector<TableRef> m_tables;
+    std::vector<unsigned> m_table_idxs;
 
     // The link column that this view contain backlinks for.
     const BacklinkColumn* m_linked_column = nullptr;
@@ -763,6 +780,8 @@ inline TableViewBase::TableViewBase(Table* parent, size_t column, BasicRowExpr<c
 inline TableViewBase::TableViewBase(const TableViewBase& tv)
     : RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default())
     , m_table(tv.m_table)
+    , m_tables(tv.m_tables)
+    , m_table_idxs(tv.m_table_idxs)
     , m_linked_column(tv.m_linked_column)
     , m_linked_row(tv.m_linked_row)
     , m_linkview_source(tv.m_linkview_source)
@@ -791,6 +810,8 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv)
 inline TableViewBase::TableViewBase(TableViewBase&& tv) noexcept
     : RowIndexes(std::move(tv.m_row_indexes))
     , m_table(std::move(tv.m_table))
+    , m_tables(std::move(tv.m_tables))
+    , m_table_idxs(std::move(tv.m_table_idxs))
     , m_linked_column(tv.m_linked_column)
     , m_linked_row(tv.m_linked_row)
     , m_linkview_source(std::move(tv.m_linkview_source))
@@ -828,6 +849,8 @@ inline TableViewBase& TableViewBase::operator=(TableViewBase&& tv) noexcept
     if (m_table)
         m_table->move_registered_view(&tv, this);
 
+    m_tables = std::move(tv.m_tables);
+    m_table_idxs = std::move(tv.m_table_idxs);
     m_row_indexes.move_assign(tv.m_row_indexes);
     m_query = std::move(tv.m_query);
     m_num_detached_refs = tv.m_num_detached_refs;
@@ -858,6 +881,8 @@ inline TableViewBase& TableViewBase::operator=(const TableViewBase& tv)
             m_table->register_view(this);
     }
 
+    m_tables = tv.m_tables;
+    m_table_idxs = tv.m_table_idxs;
     Allocator& alloc = m_row_indexes.get_alloc();
     MemRef mem = tv.m_row_indexes.get_root_array()->clone_deep(alloc); // Throws
     _impl::DeepArrayRefDestroyGuard ref_guard(mem.get_ref(), alloc);
@@ -1327,7 +1352,13 @@ inline TableView::RowExpr TableView::get(size_t row_ndx) noexcept
     REALM_ASSERT_ROW(row_ndx);
     const int64_t real_ndx = m_row_indexes.get(row_ndx);
     REALM_ASSERT(real_ndx != detached_ref);
-    return m_table->get(to_size_t(real_ndx));
+    if (m_tables.size() > 0) {
+        size_t table_idx = m_table_idxs[row_ndx];
+        return m_tables[table_idx]->get(to_size_t(real_ndx));
+    }
+    else {
+        return m_table->get(to_size_t(real_ndx));
+    }
 }
 
 inline TableView::ConstRowExpr TableView::get(size_t row_ndx) const noexcept

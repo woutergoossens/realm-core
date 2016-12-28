@@ -302,7 +302,7 @@ size_t Table::get_backlink_count(size_t row_ndx, const Table& origin, size_t ori
 
 std::pair<Table*, size_t> Table::get_descendant_row(size_t row_ndx) const noexcept
 {
-    for (auto& col_ndx : m_descendants) {
+    for (auto& col_ndx : m_subclass_backlink_columns) {
         const BacklinkColumn& backlink_col = get_column_backlink(col_ndx);
         size_t back_link = backlink_col.get_backlink(row_ndx, 0);
         if (back_link != npos) {
@@ -883,7 +883,7 @@ void Table::insert_root_column(size_t col_ndx, DataType type, StringData name, L
     refresh_link_target_accessors(col_ndx);
 
     // Adjust the descendants column indexes
-    for (size_t& col : m_descendants) {
+    for (size_t& col : m_subclass_backlink_columns) {
         col++;
     }
 }
@@ -2179,6 +2179,13 @@ void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
         size_t num_rows_to_insert = num_rows;
         size_t prior_num_rows = m_size - num_rows;
         repl->insert_empty_rows(this, row_ndx, num_rows_to_insert, prior_num_rows); // Throws
+    }
+
+    if (m_super) {
+        size_t srow = m_super->add_empty_row(num_rows);
+        for (size_t i = 0; i < num_rows; i++) {
+            this->set_link(m_super_link_col, row_ndx + i, srow + i);
+        }
     }
 }
 
@@ -5755,10 +5762,10 @@ void Table::adj_move_column(size_t from, size_t to) noexcept
 
 void Table::adjust_erase_descendants(size_t ndx)
 {
-    auto it = m_descendants.begin();
-    while (it != m_descendants.end()) {
+    auto it = m_subclass_backlink_columns.begin();
+    while (it != m_subclass_backlink_columns.end()) {
         if (*it == ndx) {
-            it = m_descendants.erase(it);
+            it = m_subclass_backlink_columns.erase(it);
         }
         else {
             if (*it > ndx) {
@@ -5938,7 +5945,8 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
                     size_t link_col_ndx = m_spec.get_origin_column_ndx(col_ndx);
                     std::string name = origin_table.get_column_name(link_col_ndx);
                     if (name.substr(0, 6) == std::string("_super")) {
-                        m_descendants.push_back(col_ndx);
+                        m_subclass_backlink_columns.push_back(col_ndx);
+                        m_subclass_tables.push_back(&origin_table);
                     }
                     origin_table.connect_opposite_link_columns(link_col_ndx, *this, col_ndx);
                 }

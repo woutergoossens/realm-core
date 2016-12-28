@@ -915,10 +915,14 @@ private:
     // Group::advance_transact().
     typedef std::vector<ColumnBase*> column_accessors;
     column_accessors m_cols;
-    std::vector<size_t> m_descendants;
+    std::vector<size_t> m_subclass_backlink_columns;
     Table* m_super = nullptr;
     size_t m_super_link_col = 0;
 
+public:
+    std::vector<Table*> m_subclass_tables;
+
+private:
     mutable std::atomic<size_t> m_ref_count;
 
     // If this table is a root table (has independent descriptor),
