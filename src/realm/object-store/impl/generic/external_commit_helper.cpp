@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <realm/object-store/impl/external_commit_helper.hpp>
+#include "impl/external_commit_helper.hpp"
 
-#include <realm/object-store/impl/realm_coordinator.hpp>
+#include "impl/realm_coordinator.hpp"
 
 #include <realm/history.hpp>
 #include <realm/replication.hpp>
@@ -27,26 +27,24 @@ using namespace realm;
 using namespace realm::_impl;
 
 ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
-    : m_parent(parent)
-    , m_history(realm::make_in_realm_history(parent.get_path()))
-    , m_sg(DB::create(*m_history,
-                      DBOptions(parent.is_in_memory() ? DBOptions::Durability::MemOnly : DBOptions::Durability::Full,
-                                parent.get_encryption_key().data())))
-    , m_thread(std::async(std::launch::async, [=] {
-        auto tr = m_sg->start_read();
-        while (m_sg->wait_for_change(tr)) {
-            tr->end_read();
-            tr = m_sg->start_read();
-            m_parent.on_change();
-        }
-    }))
+: m_parent(parent)
+, m_history(realm::make_in_realm_history(parent.get_path()))
+, m_sg(*m_history, TransactionOptions(parent.is_in_memory() ? TransactionOptions::Durability::MemOnly
+                                                            : TransactionOptions::Durability::Full,
+                                      parent.get_encryption_key().data()))
+, m_thread(std::async(std::launch::async, [=] {
+    m_sg.begin_read();
+    while (m_sg.wait_for_change()) {
+        m_sg.end_read();
+        m_sg.begin_read();
+        m_parent.on_change();
+    }
+}))
 {
 }
 
 ExternalCommitHelper::~ExternalCommitHelper()
 {
-    m_sg->wait_for_change_release();
+    m_sg.wait_for_change_release();
     m_thread.wait(); // Wait for the thread to exit
 }
-
-void ExternalCommitHelper::notify_others() {}

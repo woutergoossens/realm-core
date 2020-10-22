@@ -16,14 +16,16 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <realm/object-store/schema.hpp>
+#include "schema.hpp"
 
-#include <realm/object-store/object_schema.hpp>
-#include <realm/object-store/object_store.hpp>
-#include <realm/object-store/object_schema.hpp>
-#include <realm/object-store/property.hpp>
+#include "object_schema.hpp"
+#include "object_store.hpp"
+#include "object_schema.hpp"
+#include "property.hpp"
 
 #include <algorithm>
+#include <queue>
+#include <unordered_set>
 
 using namespace realm;
 
@@ -32,30 +34,30 @@ bool operator==(Schema const& a, Schema const& b) noexcept
 {
     return static_cast<Schema::base const&>(a) == static_cast<Schema::base const&>(b);
 }
-} // namespace realm
+}
 
 Schema::Schema() noexcept = default;
 Schema::~Schema() = default;
 Schema::Schema(Schema const&) = default;
-Schema::Schema(Schema&&) noexcept = default;
+Schema::Schema(Schema &&) noexcept = default;
 Schema& Schema::operator=(Schema const&) = default;
 Schema& Schema::operator=(Schema&&) noexcept = default;
 
-Schema::Schema(std::initializer_list<ObjectSchema> types)
-    : Schema(base(types))
-{
-}
+Schema::Schema(std::initializer_list<ObjectSchema> types) : Schema(base(types)) { }
 
 Schema::Schema(base types) noexcept
-    : base(std::move(types))
+: base(std::move(types))
 {
-    std::sort(begin(), end(), [](ObjectSchema const& lft, ObjectSchema const& rgt) { return lft.name < rgt.name; });
+    std::sort(begin(), end(), [](ObjectSchema const& lft, ObjectSchema const& rgt) {
+        return lft.name < rgt.name;
+    });
 }
 
 Schema::iterator Schema::find(StringData name) noexcept
 {
-    auto it = std::lower_bound(begin(), end(), name,
-                               [](ObjectSchema const& lft, StringData rgt) { return lft.name < rgt; });
+    auto it = std::lower_bound(begin(), end(), name, [](ObjectSchema const& lft, StringData rgt) {
+        return lft.name < rgt;
+    });
     if (it != end() && it->name != name) {
         it = end();
     }
@@ -64,7 +66,7 @@ Schema::iterator Schema::find(StringData name) noexcept
 
 Schema::const_iterator Schema::find(StringData name) const noexcept
 {
-    return const_cast<Schema*>(this)->find(name);
+    return const_cast<Schema *>(this)->find(name);
 }
 
 Schema::iterator Schema::find(ObjectSchema const& object) noexcept
@@ -74,26 +76,83 @@ Schema::iterator Schema::find(ObjectSchema const& object) noexcept
 
 Schema::const_iterator Schema::find(ObjectSchema const& object) const noexcept
 {
-    return const_cast<Schema*>(this)->find(object);
+    return const_cast<Schema *>(this)->find(object);
 }
 
-void Schema::validate() const
+namespace {
+
+struct CheckObjectPath {
+    const ObjectSchema& object;
+    std::string path;
+};
+
+// a non-recursive search that returns a path to any embedded object that has multiple paths from the start
+std::string do_check(Schema const& schema, const ObjectSchema& start)
+{
+    std::queue<CheckObjectPath> to_visit;
+    std::unordered_set<std::string> visited;
+    to_visit.push(CheckObjectPath{start, start.name});
+
+    while (to_visit.size() > 0) {
+        auto current = to_visit.front();
+        visited.insert(current.object.name);
+        for (auto& prop : current.object.persisted_properties) {
+            if (prop.type == PropertyType::Object) {
+                auto it = schema.find(prop.object_type);
+                REALM_ASSERT(it != schema.end()); // this succeeds if the schema is otherwise valid
+                auto next_path = current.path + "." + prop.name;
+                if (visited.find(prop.object_type) == visited.end()) {
+                    to_visit.push(CheckObjectPath{*it, next_path});
+                }
+                else if (it->is_embedded) {
+                    return next_path;
+                }
+            }
+        }
+        to_visit.pop();
+    }
+    return "";
+}
+
+void check_for_embedded_objects_loop(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions)
+{
+    for (auto const& object : schema) {
+        if (object.is_embedded) {
+            std::string loop = do_check(schema, object);
+            if (!loop.empty()) {
+                exceptions.push_back(util::format("Cycles containing embedded objects are not currently supported: '%1'", loop));
+            }
+        }
+    }
+}
+}
+
+void Schema::validate(bool for_sync) const
 {
     std::vector<ObjectSchemaValidationException> exceptions;
 
     // As the types are added sorted by name, we can detect duplicates by just looking at the following element.
     auto find_next_duplicate = [&](const_iterator start) {
-        return std::adjacent_find(
-            start, cend(), [](ObjectSchema const& lft, ObjectSchema const& rgt) { return lft.name == rgt.name; });
+        return std::adjacent_find(start, cend(), [](ObjectSchema const& lft, ObjectSchema const& rgt) {
+            return lft.name == rgt.name;
+        });
     };
 
     for (auto it = find_next_duplicate(cbegin()); it != cend(); it = find_next_duplicate(++it)) {
-        exceptions.push_back(
-            ObjectSchemaValidationException("Type '%1' appears more than once in the schema.", it->name));
+        exceptions.push_back(ObjectSchemaValidationException("Type '%1' appears more than once in the schema.",
+                                                             it->name));
     }
 
     for (auto const& object : *this) {
-        object.validate(*this, exceptions);
+        object.validate(*this, exceptions, for_sync);
+    }
+
+    // TODO: remove this client side check once the server supports it
+    // or generates a better error message.
+    if (exceptions.empty()) {
+        // only attempt to check for loops if the rest of the schema is valid
+        // because we rely on all link types being defined
+        check_for_embedded_objects_loop(*this, exceptions);
     }
 
     if (exceptions.size()) {
@@ -101,7 +160,8 @@ void Schema::validate() const
     }
 }
 
-static void compare(ObjectSchema const& existing_schema, ObjectSchema const& target_schema,
+static void compare(ObjectSchema const& existing_schema,
+                    ObjectSchema const& target_schema,
                     std::vector<SchemaChange>& changes)
 {
     for (auto& current_prop : existing_schema.persisted_properties) {
@@ -115,9 +175,9 @@ static void compare(ObjectSchema const& existing_schema, ObjectSchema const& tar
             changes.emplace_back(schema_change::RemoveProperty{&existing_schema, &current_prop});
             continue;
         }
-        if (current_prop.type != target_prop->type || current_prop.object_type != target_prop->object_type ||
-            is_array(current_prop.type) != is_array(target_prop->type) ||
-            is_set(current_prop.type) != is_set(target_prop->type)) {
+        if (current_prop.type != target_prop->type ||
+            current_prop.object_type != target_prop->object_type ||
+            is_array(current_prop.type) != is_array(target_prop->type)) {
 
             changes.emplace_back(schema_change::ChangePropertyType{&existing_schema, &current_prop, target_prop});
             continue;
@@ -148,7 +208,7 @@ static void compare(ObjectSchema const& existing_schema, ObjectSchema const& tar
     }
 }
 
-template <typename T, typename U, typename Func>
+template<typename T, typename U, typename Func>
 void Schema::zip_matching(T&& a, U&& b, Func&& func) noexcept
 {
     size_t i = 0, j = 0;
@@ -174,6 +234,7 @@ void Schema::zip_matching(T&& a, U&& b, Func&& func) noexcept
         func(&a[i], nullptr);
     for (; j < b.size(); ++j)
         func(nullptr, &b[j]);
+
 }
 
 std::vector<SchemaChange> Schema::compare(Schema const& target_schema, bool include_table_removals) const
@@ -232,12 +293,12 @@ bool operator==(SchemaChange const& lft, SchemaChange const& rgt) noexcept
     struct Visitor {
         SchemaChange const& value;
 
-#define REALM_SC_COMPARE(type, ...)                                                                                  \
-    bool operator()(type rgt) const                                                                                  \
-    {                                                                                                                \
-        auto cmp = [](auto&& v) { return std::tie(__VA_ARGS__); };                                                   \
-        return cmp(value.type) == cmp(rgt);                                                                          \
-    }
+        #define REALM_SC_COMPARE(type, ...) \
+            bool operator()(type rgt) const \
+            { \
+                auto cmp = [](auto&& v) { return std::tie(__VA_ARGS__); }; \
+                return cmp(value.type) == cmp(rgt); \
+            }
 
         REALM_SC_COMPARE(AddIndex, v.object, v.property)
         REALM_SC_COMPARE(AddProperty, v.object, v.property)
@@ -252,7 +313,7 @@ bool operator==(SchemaChange const& lft, SchemaChange const& rgt) noexcept
         REALM_SC_COMPARE(RemoveIndex, v.object, v.property)
         REALM_SC_COMPARE(RemoveProperty, v.object, v.property)
 
-#undef REALM_SC_COMPARE
+        #undef REALM_SC_COMPARE
     } visitor{lft};
     return rgt.visit(visitor);
 }

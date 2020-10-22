@@ -36,11 +36,13 @@
 
 namespace realm {
 namespace app {
-struct AppError;
+    struct AppError;
+    class MongoClient;
 } // namespace app
 
 class SyncSession;
 class SyncManager;
+
 // A superclass that bindings can inherit from in order to store information
 // upon a `SyncUser` object.
 class SyncUserContext {
@@ -90,10 +92,14 @@ struct SyncUserProfile {
     // The maximum age of the user.
     util::Optional<std::string> max_age;
 
-    SyncUserProfile(util::Optional<std::string> name, util::Optional<std::string> email,
-                    util::Optional<std::string> picture_url, util::Optional<std::string> first_name,
-                    util::Optional<std::string> last_name, util::Optional<std::string> gender,
-                    util::Optional<std::string> birthday, util::Optional<std::string> min_age,
+    SyncUserProfile(util::Optional<std::string> name,
+                    util::Optional<std::string> email,
+                    util::Optional<std::string> picture_url,
+                    util::Optional<std::string> first_name,
+                    util::Optional<std::string> last_name,
+                    util::Optional<std::string> gender,
+                    util::Optional<std::string> birthday,
+                    util::Optional<std::string> min_age,
                     util::Optional<std::string> max_age);
     SyncUserProfile() = default;
 };
@@ -121,8 +127,7 @@ struct SyncUserIdentity {
 // A `SyncUser` represents a single user account. Each user manages the sessions that
 // are associated with it.
 class SyncUser : public std::enable_shared_from_this<SyncUser> {
-    friend class SyncSession;
-
+friend class SyncSession;
 public:
     enum class State : std::size_t {
         LoggedOut,
@@ -131,8 +136,12 @@ public:
     };
 
     // Don't use this directly; use the `SyncManager` APIs. Public for use with `make_shared`.
-    SyncUser(std::string refresh_token, const std::string id, const std::string provider_type,
-             std::string access_token, SyncUser::State state, const std::string device_id,
+    SyncUser(std::string refresh_token,
+             const std::string id,
+             const std::string provider_type,
+             std::string access_token,
+             SyncUser::State state,
+             const std::string device_id,
              std::shared_ptr<SyncManager> sync_manager);
 
     // Return a list of all sessions belonging to this user.
@@ -224,6 +233,10 @@ public:
         return m_sync_manager;
     }
 
+    /// Retrieves a general-purpose service client for the Realm Cloud service
+    /// @param service_name The name of the cluster
+    app::MongoClient mongo_client(const std::string& service_name);
+
 private:
     static SyncUserContextFactory s_binding_context_factory;
     static std::mutex s_binding_context_factory_mutex;
@@ -269,13 +282,12 @@ private:
     std::shared_ptr<SyncManager> m_sync_manager;
 };
 
-} // namespace realm
+}
 
 namespace std {
-template <>
-struct hash<realm::SyncUserIdentity> {
+template<> struct hash<realm::SyncUserIdentity> {
     size_t operator()(realm::SyncUserIdentity const&) const;
 };
-} // namespace std
+}
 
 #endif // REALM_OS_SYNC_USER_HPP

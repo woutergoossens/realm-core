@@ -30,14 +30,14 @@ namespace app {
 
 class PushClient {
 public:
-    PushClient(const std::string& service_name, const std::string& app_id, const uint64_t timeout_ms,
-               std::shared_ptr<AuthRequestClient> auth_request_client)
-        : m_service_name(service_name)
-        , m_app_id(app_id)
-        , m_timeout_ms(timeout_ms)
-        , m_auth_request_client(auth_request_client)
-    {
-    }
+    PushClient(const std::string& service_name,
+               const std::string& app_id,
+               const uint64_t timeout_ms,
+               std::shared_ptr<AuthRequestClient> auth_request_client) :
+    m_service_name(service_name),
+    m_app_id(app_id),
+    m_timeout_ms(timeout_ms),
+    m_auth_request_client(auth_request_client) { }
 
     ~PushClient() = default;
     PushClient(const PushClient&) = default;
@@ -50,7 +50,8 @@ public:
     /// @param registration_token GCM registration token for the device.
     /// @param sync_user The sync user requesting push registration.
     /// @param completion_block An error will be returned should something go wrong.
-    void register_device(const std::string& registration_token, std::shared_ptr<SyncUser> sync_user,
+    void register_device(const std::string& registration_token,
+                         std::shared_ptr<SyncUser> sync_user,
                          std::function<void(util::Optional<AppError>)> completion_block);
 
 

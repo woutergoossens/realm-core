@@ -58,10 +58,10 @@ using namespace realm::_impl;
 //     - Reads m_results_were_used
 
 ResultsNotifier::ResultsNotifier(Results& target)
-    : ResultsNotifierBase(target.get_realm())
-    , m_query(std::make_unique<Query>(target.get_query()))
-    , m_descriptor_ordering(target.get_descriptor_ordering())
-    , m_target_is_in_table_order(target.is_in_table_order())
+: ResultsNotifierBase(target.get_realm())
+, m_query(std::make_unique<Query>(target.get_query()))
+, m_descriptor_ordering(target.get_descriptor_ordering())
+, m_target_is_in_table_order(target.is_in_table_order())
 {
     auto table = m_query->get_table();
     if (table) {
@@ -87,8 +87,7 @@ bool ResultsNotifier::get_tableview(TableView& out)
     auto& transaction = source_shared_group();
     if (transaction.get_transact_stage() != DB::transact_Reading)
         return false;
-    if (m_delivered_transaction->get_version_of_current_transaction() !=
-        transaction.get_version_of_current_transaction())
+    if (m_delivered_transaction->get_version_of_current_transaction() != transaction.get_version_of_current_transaction())
         return false;
 
     out = std::move(*transaction.import_copy_of(*m_delivered_tv, PayloadPolicy::Move));
@@ -191,10 +190,8 @@ bool ResultsNotifier::prepare_to_deliver()
         return false;
     }
     if (!m_handover_tv) {
-        bool transaction_is_stale =
-            m_delivered_transaction &&
-            (!realm->is_in_read_transaction() ||
-             realm->read_transaction_version() > m_delivered_transaction->get_version_of_current_transaction());
+        bool transaction_is_stale = m_delivered_transaction &&
+            (!realm->is_in_read_transaction() || realm->read_transaction_version() > m_delivered_transaction->get_version_of_current_transaction());
         if (transaction_is_stale) {
             m_delivered_tv.reset();
             m_delivered_transaction.reset();
@@ -221,8 +218,8 @@ void ResultsNotifier::do_attach_to(Transaction& sg)
 }
 
 ListResultsNotifier::ListResultsNotifier(Results& target)
-    : ResultsNotifierBase(target.get_realm())
-    , m_list(target.get_list())
+: ResultsNotifierBase(target.get_realm())
+, m_list(target.get_list())
 {
     auto& ordering = target.get_descriptor_ordering();
     for (size_t i = 0, sz = ordering.size(); i < sz; i++) {
@@ -232,6 +229,7 @@ ListResultsNotifier::ListResultsNotifier(Results& target)
         if (descr->get_type() == DescriptorType::Distinct)
             m_distinct = true;
     }
+
 }
 
 void ListResultsNotifier::release_data() noexcept
@@ -258,8 +256,8 @@ bool ListResultsNotifier::do_add_required_change_info(TransactionChangeInfo& inf
     if (!m_list->is_attached())
         return false; // origin row was deleted after the notification was added
 
-    info.lists.push_back(
-        {m_list->get_table()->get_key(), m_list->get_key().value, m_list->get_col_key().value, &m_change});
+    info.lists.push_back({m_list->get_table()->get_key(), m_list->get_key().value,
+        m_list->get_col_key().value, &m_change});
 
     m_info = &info;
     return true;
@@ -295,7 +293,8 @@ void ListResultsNotifier::calculate_changes()
             }
         }
 
-        m_change = CollectionChangeBuilder::calculate(m_previous_indices, *m_run_indices, [=](int64_t key) {
+        m_change = CollectionChangeBuilder::calculate(m_previous_indices, *m_run_indices,
+                                                      [=](int64_t key) {
             return m_change.modifications_new.contains(static_cast<size_t>(key));
         });
     }

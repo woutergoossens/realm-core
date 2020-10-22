@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <realm/object-store/sync/generic_network_transport.hpp>
+#include "sync/generic_network_transport.hpp"
 
 #include <string>
 

@@ -24,7 +24,7 @@
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/shared_realm.hpp>
 
-#include "impl/realm_coordinator.hpp"
+#include <realm/object-store/impl/realm_coordinator.hpp>
 
 #include <realm/db.hpp>
 #include <realm/keys.hpp>
@@ -34,9 +34,9 @@ class ThreadSafeReference::Payload {
 public:
     virtual ~Payload() = default;
     Payload(Realm& realm)
-        : m_transaction(realm.is_in_read_transaction() ? realm.duplicate() : nullptr)
-        , m_coordinator(Realm::Internal::get_coordinator(realm).shared_from_this())
-        , m_created_in_write_transaction(realm.is_in_transaction())
+    : m_transaction(realm.is_in_read_transaction() ? realm.duplicate() : nullptr)
+    , m_coordinator(Realm::Internal::get_coordinator(realm).shared_from_this())
+    , m_created_in_write_transaction(realm.is_in_transaction())
     {
     }
 
@@ -66,14 +66,14 @@ void ThreadSafeReference::Payload::refresh_target_realm(Realm& realm)
     }
 }
 
-template <>
+template<>
 class ThreadSafeReference::PayloadImpl<List> : public ThreadSafeReference::Payload {
 public:
     PayloadImpl(List const& list)
-        : Payload(*list.get_realm())
-        , m_key(list.get_parent_object_key())
-        , m_table_key(list.get_parent_table_key())
-        , m_col_key(list.get_parent_column_key())
+    : Payload(*list.get_realm())
+    , m_key(list.get_parent_object_key())
+    , m_table_key(list.get_parent_table_key())
+    , m_col_key(list.get_parent_column_key())
     {
     }
 
@@ -89,13 +89,13 @@ private:
     ColKey m_col_key;
 };
 
-template <>
+template<>
 class ThreadSafeReference::PayloadImpl<Object> : public ThreadSafeReference::Payload {
 public:
     PayloadImpl(Object const& object)
-        : Payload(*object.get_realm())
-        , m_key(object.obj().get_key())
-        , m_object_schema_name(object.get_object_schema().name)
+    : Payload(*object.get_realm())
+    , m_key(object.obj().get_key())
+    , m_object_schema_name(object.get_object_schema().name)
     {
     }
 
@@ -109,12 +109,12 @@ private:
     std::string m_object_schema_name;
 };
 
-template <>
+template<>
 class ThreadSafeReference::PayloadImpl<Results> : public ThreadSafeReference::Payload {
 public:
     PayloadImpl(Results const& r)
-        : Payload(*r.get_realm())
-        , m_ordering(r.get_descriptor_ordering())
+    : Payload(*r.get_realm())
+    , m_ordering(r.get_descriptor_ordering())
     {
         if (auto list = r.get_list()) {
             m_key = list->get_key();
@@ -128,8 +128,7 @@ public:
                 // the parent of the List or LinkingObjects was created in this
                 // write transaction, but Query doesn't expose a way to check
                 // if the source view is valid so we have to forbid it always.
-                throw std::logic_error("Cannot create a ThreadSafeReference to Results backed by a List of objects "
-                                       "or LinkingObjects inside a write transaction");
+                throw std::logic_error("Cannot create a ThreadSafeReference to Results backed by a List of objects or LinkingObjects inside a write transaction");
             }
             m_query = m_transaction->import_copy_of(q, PayloadPolicy::Stay);
         }
@@ -166,12 +165,12 @@ private:
     ColKey m_col_key;
 };
 
-template <>
+template<>
 class ThreadSafeReference::PayloadImpl<std::shared_ptr<Realm>> : public ThreadSafeReference::Payload {
 public:
     PayloadImpl(std::shared_ptr<Realm> const& realm)
-        : Payload(*realm)
-        , m_realm(realm)
+    : Payload(*realm)
+    , m_realm(realm)
     {
     }
 
@@ -189,7 +188,7 @@ ThreadSafeReference::~ThreadSafeReference() = default;
 ThreadSafeReference::ThreadSafeReference(ThreadSafeReference&&) noexcept = default;
 ThreadSafeReference& ThreadSafeReference::operator=(ThreadSafeReference&&) noexcept = default;
 
-template <typename T>
+template<typename T>
 ThreadSafeReference::ThreadSafeReference(T const& value)
 {
     auto realm = value.get_realm();
@@ -197,7 +196,7 @@ ThreadSafeReference::ThreadSafeReference(T const& value)
     m_payload.reset(new PayloadImpl<T>(value));
 }
 
-template <>
+template<>
 ThreadSafeReference::ThreadSafeReference(std::shared_ptr<Realm> const& value)
 {
     m_payload.reset(new PayloadImpl<std::shared_ptr<Realm>>(value));
@@ -207,7 +206,7 @@ template ThreadSafeReference::ThreadSafeReference(List const&);
 template ThreadSafeReference::ThreadSafeReference(Results const&);
 template ThreadSafeReference::ThreadSafeReference(Object const&);
 
-template <typename T>
+template<typename T>
 T ThreadSafeReference::resolve(std::shared_ptr<Realm> const& realm)
 {
     REALM_ASSERT(realm);
@@ -227,7 +226,7 @@ T ThreadSafeReference::resolve(std::shared_ptr<Realm> const& realm)
     }
 }
 
-template <>
+template<>
 std::shared_ptr<Realm> ThreadSafeReference::resolve<std::shared_ptr<Realm>>(std::shared_ptr<Realm> const&)
 {
     REALM_ASSERT(m_payload);

@@ -58,10 +58,8 @@ public:
     // If no version is provided a live thread-confined Realm is returned.
     // Otherwise, a frozen Realm at the given version is returned. This
     // can be read from any thread.
-    std::shared_ptr<Realm> get_realm(Realm::Config config, util::Optional<VersionID> version)
-        REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
-    std::shared_ptr<Realm> get_realm(std::shared_ptr<util::Scheduler> = nullptr)
-        REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
+    std::shared_ptr<Realm> get_realm(Realm::Config config, util::Optional<VersionID> version) REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
+    std::shared_ptr<Realm> get_realm(std::shared_ptr<util::Scheduler> = nullptr) REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
 #if REALM_ENABLE_SYNC
     // Get a thread-local shared Realm with the given configuration
     // If the Realm is not already present, it will be fully downloaded before being returned.
@@ -77,9 +75,7 @@ public:
 #endif
 
     // Get the existing cached Realm if it exists for the specified scheduler or config.scheduler
-    std::shared_ptr<Realm> get_cached_realm(Realm::Config const& config,
-                                            std::shared_ptr<util::Scheduler> scheduler = nullptr)
-        REQUIRES(!m_realm_mutex);
+    std::shared_ptr<Realm> get_cached_realm(Realm::Config const& config, std::shared_ptr<util::Scheduler> scheduler = nullptr) REQUIRES(!m_realm_mutex);
     // Get a Realm which is not bound to the current execution context
     ThreadSafeReference get_unbound_realm() REQUIRES(!m_realm_mutex);
 
@@ -87,29 +83,14 @@ public:
     // be managed by this coordinator.
     void bind_to_context(Realm& realm) REQUIRES(!m_realm_mutex);
 
-    Realm::Config get_config() const
-    {
-        return m_config;
-    }
+    Realm::Config get_config() const { return m_config; }
 
     uint64_t get_schema_version() const noexcept REQUIRES(!m_schema_cache_mutex);
-    const std::string& get_path() const noexcept
-    {
-        return m_config.path;
-    }
-    const std::vector<char>& get_encryption_key() const noexcept
-    {
-        return m_config.encryption_key;
-    }
-    bool is_in_memory() const noexcept
-    {
-        return m_config.in_memory;
-    }
+    const std::string& get_path() const noexcept { return m_config.path; }
+    const std::vector<char>& get_encryption_key() const noexcept { return m_config.encryption_key; }
+    bool is_in_memory() const noexcept { return m_config.in_memory; }
     // Returns the number of versions in the Realm file.
-    uint_fast64_t get_number_of_versions() const
-    {
-        return m_db->get_number_of_versions();
-    }
+    uint_fast64_t get_number_of_versions() const { return m_db->get_number_of_versions(); };
 
     // To avoid having to re-read and validate the file's schema every time a
     // new read transaction is begun, RealmCoordinator maintains a cache of the
@@ -120,12 +101,11 @@ public:
 
     // Get the latest cached schema and the transaction version which it applies
     // to. Returns false if there is no cached schema.
-    bool get_cached_schema(Schema& schema, uint64_t& schema_version, uint64_t& transaction) const
-        noexcept REQUIRES(!m_schema_cache_mutex);
+    bool get_cached_schema(Schema& schema, uint64_t& schema_version, uint64_t& transaction) const noexcept REQUIRES(!m_schema_cache_mutex);
 
     // Cache the state of the schema at the given transaction version
-    void cache_schema(Schema const& new_schema, uint64_t new_schema_version, uint64_t transaction_version)
-        REQUIRES(!m_schema_cache_mutex);
+    void cache_schema(Schema const& new_schema, uint64_t new_schema_version,
+                      uint64_t transaction_version) REQUIRES(!m_schema_cache_mutex);
     // If there is a schema cached for transaction version `previous`, report
     // that it is still valid at transaction version `next`
     void advance_schema_cache(uint64_t previous, uint64_t next) REQUIRES(!m_schema_cache_mutex);
@@ -161,7 +141,7 @@ public:
 
     static void register_notifier(std::shared_ptr<CollectionNotifier> notifier);
 
-    std::shared_ptr<Group> begin_read(VersionID version = {}, bool frozen_transaction = false);
+    std::shared_ptr<Group> begin_read(VersionID version={}, bool frozen_transaction = false);
 
     // Check if advance_to_ready() would actually advance the Realm's read version
     bool can_advance(Realm& realm);
@@ -196,13 +176,10 @@ public:
     void close();
     bool compact();
 
-    template <typename Pred>
+    template<typename Pred>
     util::CheckedUniqueLock wait_for_notifiers(Pred&& wait_predicate) REQUIRES(!m_notifier_mutex);
 
-    AuditInterface* audit_context() const noexcept
-    {
-        return m_audit_context.get();
-    }
+    AuditInterface* audit_context() const noexcept { return m_audit_context.get(); }
 
 private:
     friend Realm::Internal;
@@ -252,10 +229,9 @@ private:
 
     void set_config(const Realm::Config&) REQUIRES(m_realm_mutex, !m_schema_cache_mutex);
     void create_sync_session(bool force_client_resync);
-    std::shared_ptr<Realm> do_get_cached_realm(Realm::Config const& config,
-                                               std::shared_ptr<util::Scheduler> scheduler = nullptr)
-        REQUIRES(m_realm_mutex);
-    void do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm, util::Optional<VersionID> version,
+    std::shared_ptr<Realm> do_get_cached_realm(Realm::Config const& config, std::shared_ptr<util::Scheduler> scheduler = nullptr) REQUIRES(m_realm_mutex);
+    void do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm,
+                      util::Optional<VersionID> version,
                       util::CheckedUniqueLock& realm_lock) REQUIRES(m_realm_mutex);
     void run_async_notifiers() REQUIRES(!m_notifier_mutex);
     void advance_helper_shared_group_to_latest();
@@ -264,9 +240,9 @@ private:
     std::vector<std::shared_ptr<_impl::CollectionNotifier>> notifiers_for_realm(Realm&) REQUIRES(m_notifier_mutex);
 };
 
-void translate_file_exception(StringData path, bool immutable = false);
+void translate_file_exception(StringData path, bool immutable=false);
 
-template <typename Pred>
+template<typename Pred>
 util::CheckedUniqueLock RealmCoordinator::wait_for_notifiers(Pred&& wait_predicate)
 {
     util::CheckedUniqueLock lock(m_notifier_mutex);

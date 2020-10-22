@@ -25,10 +25,9 @@
 namespace realm {
 namespace bson {
 class Bson;
-template <typename>
-class IndexedMap;
+template <typename> class IndexedMap;
 using BsonDocument = IndexedMap<Bson>;
-} // namespace bson
+}
 namespace app {
 
 typedef std::string IdentityProvider;
@@ -81,7 +80,7 @@ IdentityProvider provider_type_from_enum(AuthProvider provider);
 
 // Opaque credentials representing a specific Realm Object Server user.
 struct AppCredentials {
-    // Construct and return credentials from a Facebook account token.
+     // Construct and return credentials from a Facebook account token.
     static AppCredentials facebook(const AppCredentialsToken access_token);
 
     // Construct and return anonymous credentials
@@ -126,7 +125,6 @@ struct AppCredentials {
     AppCredentials(AppCredentials&&) = default;
     AppCredentials& operator=(AppCredentials const&) = default;
     AppCredentials& operator=(AppCredentials&&) = default;
-
 private:
     AppCredentials(AuthProvider provider, std::function<std::string()> factory);
     // The name of the identity provider which generated the credentials token.

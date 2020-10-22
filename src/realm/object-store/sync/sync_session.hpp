@@ -1,4 +1,4 @@
-////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////
 //
 // Copyright 2016 Realm Inc.
 //
@@ -20,14 +20,14 @@
 #define REALM_OS_SYNC_SESSION_HPP
 
 #include <realm/object-store/feature_checks.hpp>
-#include <realm/object-store/sync/generic_network_transport.hpp>
-#include <realm/sync/config.hpp>
+#include <realm/object-store/sync/sync_config.hpp>
 
 #include <realm/util/optional.hpp>
 #include <realm/version_id.hpp>
 
 #include <mutex>
 #include <unordered_map>
+#include <map>
 
 namespace realm {
 
@@ -43,8 +43,8 @@ namespace sync_session_states {
 struct Active;
 struct Dying;
 struct Inactive;
-} // namespace sync_session_states
-} // namespace _impl
+}
+}
 
 namespace sync {
 class Session;
@@ -56,15 +56,17 @@ using SyncProgressNotifierCallback = void(uint64_t transferred_bytes, uint64_t t
 namespace _impl {
 class SyncProgressNotifier {
 public:
-    enum class NotifierType { upload, download };
+    enum class NotifierType {
+        upload, download
+    };
 
-    uint64_t register_callback(std::function<SyncProgressNotifierCallback>, NotifierType direction,
-                               bool is_streaming);
+    uint64_t register_callback(std::function<SyncProgressNotifierCallback>,
+                               NotifierType direction, bool is_streaming);
     void unregister_callback(uint64_t);
 
     void set_local_version(uint64_t);
-    void update(uint64_t downloaded, uint64_t downloadable, uint64_t uploaded, uint64_t uploadable, uint64_t,
-                uint64_t);
+    void update(uint64_t downloaded, uint64_t downloadable,
+                uint64_t uploaded, uint64_t uploadable, uint64_t, uint64_t);
 
 private:
     mutable std::mutex m_mutex;
@@ -125,15 +127,11 @@ public:
     using SyncSessionStateCallback = void(PublicState old_state, PublicState new_state);
     using ConnectionStateCallback = void(ConnectionState old_state, ConnectionState new_state);
 
-    ~SyncSession();
     PublicState state() const;
     ConnectionState connection_state() const;
 
     // The on-disk path of the Realm file backing the Realm this `SyncSession` represents.
-    std::string const& path() const
-    {
-        return m_realm_path;
-    }
+    std::string const& path() const { return m_realm_path; }
 
     // Register a callback that will be called when all pending uploads have completed.
     // The callback is run asynchronously, and upon whatever thread the underlying sync client
@@ -277,6 +275,8 @@ public:
 
 private:
     using std::enable_shared_from_this<SyncSession>::shared_from_this;
+    using CompletionCallbacks = std::map<int64_t,
+          std::pair<_impl::SyncProgressNotifier::NotifierType, std::function<void(std::error_code)>>>;
 
     struct State;
     friend struct _impl::sync_session_states::Active;
@@ -305,22 +305,19 @@ private:
 
     friend class realm::SyncManager;
     // Called by SyncManager {
-    static std::shared_ptr<SyncSession> create(_impl::SyncClient& client, std::string realm_path, SyncConfig config,
-                                               bool force_client_resync)
+    static std::shared_ptr<SyncSession> create(_impl::SyncClient& client, std::string realm_path,
+                                               SyncConfig config, bool force_client_resync)
     {
         struct MakeSharedEnabler : public SyncSession {
-            MakeSharedEnabler(_impl::SyncClient& client, std::string realm_path, SyncConfig config,
-                              bool force_client_resync)
-                : SyncSession(client, std::move(realm_path), std::move(config), force_client_resync)
-            {
-            }
+            MakeSharedEnabler(_impl::SyncClient& client, std::string realm_path, SyncConfig config, bool force_client_resync)
+            : SyncSession(client, std::move(realm_path), std::move(config), force_client_resync)
+            {}
         };
-        return std::make_shared<MakeSharedEnabler>(client, std::move(realm_path), std::move(config),
-                                                   force_client_resync);
+        return std::make_shared<MakeSharedEnabler>(client, std::move(realm_path), std::move(config), force_client_resync);
     }
     // }
 
-    static std::function<void(util::Optional<app::AppError>)> handle_refresh(std::shared_ptr<SyncSession>);
+    static std::function<void(util::Optional<app::AppError>)> handle_refresh(std::shared_ptr <SyncSession>);
 
     SyncSession(_impl::SyncClient&, std::string realm_path, SyncConfig, bool force_client_resync);
 
@@ -335,14 +332,16 @@ private:
     void nonsync_transact_notify(VersionID::version_type);
 
     PublicState get_public_state() const;
-    // static ConnectionState get_public_connection_state(realm::sync::Session::ConnectionState);
+    static ConnectionState get_public_connection_state(realm::sync::Session::ConnectionState);
     void advance_state(std::unique_lock<std::mutex>& lock, const State&);
 
     void create_sync_session();
     void unregister(std::unique_lock<std::mutex>& lock);
     void did_drop_external_reference();
 
-    void add_completion_callback(_impl::SyncProgressNotifier::NotifierType direction);
+    void add_completion_callback(const std::unique_lock<std::mutex>&,
+                                 std::function<void(std::error_code)> callback,
+                                 _impl::SyncProgressNotifier::NotifierType direction);
 
     std::function<SyncSessionTransactCallback> m_sync_transact_callback;
 
@@ -362,11 +361,8 @@ private:
     std::string m_realm_path;
     _impl::SyncClient& m_client;
 
-    std::vector<std::function<void(std::error_code)>> m_download_completion_callbacks;
-    std::vector<std::function<void(std::error_code)>> m_upload_completion_callbacks;
-    // How many times a client resync has occurred. Used to discard session
-    // completion notifications from before the most recent client resync.
-    int m_client_resync_counter = 0;
+    int64_t m_completion_request_counter = 0;
+    CompletionCallbacks m_completion_callbacks;
 
     // The underlying `Session` object that is owned and managed by this `SyncSession`.
     // The session is first created when the `SyncSession` is moved out of its initial `inactive` state.
@@ -387,6 +383,6 @@ private:
     std::weak_ptr<ExternalReference> m_external_reference;
 };
 
-} // namespace realm
+}
 
 #endif // REALM_OS_SYNC_SESSION_HPP

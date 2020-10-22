@@ -19,12 +19,16 @@
 #ifndef REALM_REALM_HPP
 #define REALM_REALM_HPP
 
-#include <realm/object-store/schema.hpp>
+#include "schema.hpp"
 
 #include <realm/util/optional.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/db.hpp>
 #include <realm/version_id.hpp>
+
+#if REALM_ENABLE_SYNC
+#include <realm/sync/client.hpp>
+#endif
 
 #include <memory>
 
@@ -50,11 +54,11 @@ class Scheduler;
 }
 
 namespace _impl {
-class AnyHandover;
-class CollectionNotifier;
-class RealmCoordinator;
-class RealmFriend;
-} // namespace _impl
+    class AnyHandover;
+    class CollectionNotifier;
+    class RealmCoordinator;
+    class RealmFriend;
+}
 
 // How to handle update_schema() being called on a file which has
 // already been initialized with a different schema
@@ -138,14 +142,14 @@ public:
     // to the realm's Schema. Updating the schema with changes made within the
     // migration function is only required if you wish to use the ObjectStore
     // functions which take a Schema from within the migration function.
-    using MigrationFunction = std::function<void(SharedRealm old_realm, SharedRealm realm, Schema&)>;
+    using MigrationFunction = std::function<void (SharedRealm old_realm, SharedRealm realm, Schema&)>;
 
     // A callback function to be called the first time when a schema is created.
     // It is passed a SharedRealm which is in a write transaction with the schema
     // initialized. So it is possible to create some initial objects inside the callback
     // with the given SharedRealm. Those changes will be committed together with the
     // schema creation in a single transaction.
-    using DataInitializationFunction = std::function<void(SharedRealm realm)>;
+    using DataInitializationFunction = std::function<void (SharedRealm realm)>;
 
     // A callback function called when opening a SharedRealm when no cached
     // version of this Realm exists. It is passed the total bytes allocated for
@@ -156,7 +160,7 @@ public:
     //
     // WARNING / FIXME: compact() should NOT be exposed publicly on Windows
     // because it's not crash safe! It may corrupt your database if something fails
-    using ShouldCompactOnLaunchFunction = std::function<bool(uint64_t total_bytes, uint64_t used_bytes)>;
+    using ShouldCompactOnLaunchFunction = std::function<bool (uint64_t total_bytes, uint64_t used_bytes)>;
 
     struct Config {
         // Path and binary data are mutually exclusive
@@ -195,15 +199,9 @@ public:
         ShouldCompactOnLaunchFunction should_compact_on_launch_function;
 
         // WARNING: The original read_only() has been renamed to immutable().
-        bool immutable() const
-        {
-            return schema_mode == SchemaMode::Immutable;
-        }
+        bool immutable() const { return schema_mode == SchemaMode::Immutable; }
         // FIXME: Rename this to read_only().
-        bool read_only_alternative() const
-        {
-            return schema_mode == SchemaMode::ReadOnlyAlternative;
-        }
+        bool read_only_alternative() const { return schema_mode == SchemaMode::ReadOnlyAlternative; }
 
         // The following are intended for internal/testing purposes and
         // should not be publicly exposed in binding APIs
@@ -263,8 +261,10 @@ public:
     static SharedRealm get_frozen_realm(Config config, VersionID version);
 
     // Updates a Realm to a given schema, using the Realm's pre-set schema mode.
-    void update_schema(Schema schema, uint64_t version = 0, MigrationFunction migration_function = nullptr,
-                       DataInitializationFunction initialization_function = nullptr, bool in_transaction = false);
+    void update_schema(Schema schema, uint64_t version=0,
+                       MigrationFunction migration_function=nullptr,
+                       DataInitializationFunction initialization_function=nullptr,
+                       bool in_transaction=false);
 
     // Set the schema used for this Realm, but do not update the file's schema
     // if it is not compatible (and instead throw an error).
@@ -276,18 +276,9 @@ public:
     // ObjectStore::NotVersioned if it does not exist
     static uint64_t get_schema_version(Config const& config);
 
-    Config const& config() const
-    {
-        return m_config;
-    }
-    Schema const& schema() const
-    {
-        return m_schema;
-    }
-    uint64_t schema_version() const
-    {
-        return m_schema_version;
-    }
+    Config const& config() const { return m_config; }
+    Schema const& schema() const { return m_schema; }
+    uint64_t schema_version() const { return m_schema_version; }
 
     void begin_transaction();
     void commit_transaction();
@@ -301,14 +292,8 @@ public:
     bool is_frozen() const;
 
     // Returns true if the Realm is either in a read or frozen transaction
-    bool is_in_read_transaction() const
-    {
-        return m_group != nullptr;
-    }
-    uint64_t last_seen_transaction_version()
-    {
-        return m_schema_transaction_version;
-    }
+    bool is_in_read_transaction() const { return m_group != nullptr; }
+    uint64_t last_seen_transaction_version() { return m_schema_transaction_version; }
 
     // Returns the number of versions in the Realm file.
     uint_fast64_t get_number_of_versions() const;
@@ -325,17 +310,11 @@ public:
     bool wait_for_change();
     void wait_for_change_release();
 
-    bool is_in_migration() const noexcept
-    {
-        return m_in_migration;
-    }
+    bool is_in_migration() const noexcept { return m_in_migration; }
 
     bool refresh();
     void set_auto_refresh(bool auto_refresh);
-    bool auto_refresh() const
-    {
-        return m_auto_refresh;
-    }
+    bool auto_refresh() const { return m_auto_refresh; }
     void notify();
 
     void invalidate();
@@ -352,17 +331,11 @@ public:
     bool verify_notifications_available(bool throw_on_error = true) const;
 
     bool can_deliver_notifications() const noexcept;
-    std::shared_ptr<util::Scheduler> scheduler() const noexcept
-    {
-        return m_scheduler;
-    }
+    std::shared_ptr<util::Scheduler> scheduler() const noexcept { return m_scheduler; }
 
     // Close this Realm. Continuing to use a Realm after closing it will throw ClosedRealmException
     void close();
-    bool is_closed() const
-    {
-        return !m_group && !m_coordinator;
-    }
+    bool is_closed() const { return !m_group && !m_coordinator; }
 
     // returns the file format version upgraded from if an upgrade took place
     util::Optional<int> file_format_upgraded_from_version() const;
@@ -375,17 +348,15 @@ public:
 
     AuditInterface* audit_context() const noexcept;
 
-    template <typename... Args>
+    template<typename... Args>
     auto import_copy_of(Args&&... args)
     {
         return transaction().import_copy_of(std::forward<Args>(args)...);
     }
 
-    static SharedRealm make_shared_realm(Config config, util::Optional<VersionID> version,
-                                         std::shared_ptr<_impl::RealmCoordinator> coordinator)
+    static SharedRealm make_shared_realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator)
     {
-        return std::make_shared<Realm>(std::move(config), std::move(version), std::move(coordinator),
-                                       MakeSharedTag{});
+        return std::make_shared<Realm>(std::move(config), std::move(version), std::move(coordinator), MakeSharedTag{});
     }
 
     // Expose some internal functionality to other parts of the ObjectStore
@@ -396,30 +367,20 @@ public:
         friend class TestHelper;
         friend class ThreadSafeReference;
 
-        static Transaction& get_transaction(Realm& realm)
-        {
-            return realm.transaction();
-        }
-        static std::shared_ptr<Transaction> get_transaction_ref(Realm& realm)
-        {
-            return realm.transaction_ref();
-        }
+        static Transaction& get_transaction(Realm& realm) { return realm.transaction(); }
+        static std::shared_ptr<Transaction> get_transaction_ref(Realm& realm) { return realm.transaction_ref(); }
 
         // CollectionNotifier needs to be able to access the owning
         // coordinator to wake up the worker thread when a callback is
         // added, and coordinators need to be able to get themselves from a Realm
-        static _impl::RealmCoordinator& get_coordinator(Realm& realm)
-        {
-            return *realm.m_coordinator;
-        }
+        static _impl::RealmCoordinator& get_coordinator(Realm& realm) { return *realm.m_coordinator; }
 
         static std::shared_ptr<DB>& get_db(Realm& realm);
         static void begin_read(Realm&, VersionID);
     };
 
 private:
-    struct MakeSharedTag {
-    };
+    struct MakeSharedTag {};
 
     std::shared_ptr<_impl::RealmCoordinator> m_coordinator;
 
@@ -473,8 +434,7 @@ public:
     std::unique_ptr<BindingContext> m_binding_context;
 
     // `enable_shared_from_this` is unsafe with public constructors; use `make_shared_realm` instead
-    Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator,
-          MakeSharedTag);
+    Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator, MakeSharedTag);
 };
 
 class RealmFileException : public std::runtime_error {
@@ -499,24 +459,10 @@ public:
         FormatUpgradeRequired,
     };
     RealmFileException(Kind kind, std::string path, std::string message, std::string underlying)
-        : std::runtime_error(std::move(message))
-        , m_kind(kind)
-        , m_path(std::move(path))
-        , m_underlying(std::move(underlying))
-    {
-    }
-    Kind kind() const
-    {
-        return m_kind;
-    }
-    const std::string& path() const
-    {
-        return m_path;
-    }
-    const std::string& underlying() const
-    {
-        return m_underlying;
-    }
+    : std::runtime_error(std::move(message)), m_kind(kind), m_path(std::move(path)), m_underlying(std::move(underlying)) {}
+    Kind kind() const { return m_kind; }
+    const std::string& path() const { return m_path; }
+    const std::string& underlying() const { return m_underlying; }
 
 private:
     Kind m_kind;
@@ -536,42 +482,27 @@ public:
 
 class InvalidTransactionException : public std::logic_error {
 public:
-    InvalidTransactionException(std::string message)
-        : std::logic_error(message)
-    {
-    }
+    InvalidTransactionException(std::string message) : std::logic_error(message) {}
 };
 
 class IncorrectThreadException : public std::logic_error {
 public:
-    IncorrectThreadException()
-        : std::logic_error("Realm accessed from incorrect thread.")
-    {
-    }
+    IncorrectThreadException() : std::logic_error("Realm accessed from incorrect thread.") {}
 };
 
 class ClosedRealmException : public std::logic_error {
 public:
-    ClosedRealmException()
-        : std::logic_error("Cannot access realm that has been closed.")
-    {
-    }
+    ClosedRealmException() : std::logic_error("Cannot access realm that has been closed.") {}
 };
 
 class UninitializedRealmException : public std::runtime_error {
 public:
-    UninitializedRealmException(std::string message)
-        : std::runtime_error(message)
-    {
-    }
+    UninitializedRealmException(std::string message) : std::runtime_error(message) {}
 };
 
 class InvalidEncryptionKeyException : public std::logic_error {
 public:
-    InvalidEncryptionKeyException()
-        : std::logic_error("Encryption key must be 64 bytes.")
-    {
-    }
+    InvalidEncryptionKeyException() : std::logic_error("Encryption key must be 64 bytes.") {}
 };
 } // namespace realm
 

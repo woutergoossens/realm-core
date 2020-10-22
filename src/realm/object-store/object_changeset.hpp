@@ -19,7 +19,7 @@
 #ifndef REALM_OBJECT_CHANGESET_HPP
 #define REALM_OBJECT_CHANGESET_HPP
 
-#include <realm/object-store/collection_notifications.hpp>
+#include "collection_notifications.hpp"
 
 #include <realm/keys.hpp>
 #include <realm/util/optional.hpp>
@@ -59,31 +59,13 @@ public:
     // if the object has been modified, returns a pointer to the ObjectSet
     const ObjectSet* get_columns_modified(ObjectKeyType obj) const;
 
-    bool insertions_empty() const noexcept
-    {
-        return m_insertions.empty();
-    }
-    bool modifications_empty() const noexcept
-    {
-        return m_modifications.empty();
-    }
-    bool deletions_empty() const noexcept
-    {
-        return m_deletions.empty();
-    }
+    bool insertions_empty() const noexcept { return m_insertions.empty(); }
+    bool modifications_empty() const noexcept { return m_modifications.empty(); }
+    bool deletions_empty() const noexcept { return m_deletions.empty(); }
 
-    size_t insertions_size() const noexcept
-    {
-        return m_insertions.size();
-    }
-    size_t modifications_size() const noexcept
-    {
-        return m_modifications.size();
-    }
-    size_t deletions_size() const noexcept
-    {
-        return m_deletions.size();
-    }
+    size_t insertions_size() const noexcept { return m_insertions.size(); }
+    size_t modifications_size() const noexcept { return m_modifications.size(); }
+    size_t deletions_size() const noexcept { return m_deletions.size(); }
 
     bool clear_did_occur() const noexcept
     {
@@ -97,18 +79,9 @@ public:
     void merge(ObjectChangeSet&& other);
     void verify();
 
-    const ObjectSet& get_deletions() const noexcept
-    {
-        return m_deletions;
-    }
-    const ObjectMapToColumnSet& get_modifications() const noexcept
-    {
-        return m_modifications;
-    }
-    const ObjectSet& get_insertions() const noexcept
-    {
-        return m_insertions;
-    }
+    const ObjectSet& get_deletions() const noexcept { return m_deletions; }
+    const ObjectMapToColumnSet& get_modifications() const noexcept { return m_modifications; }
+    const ObjectSet& get_insertions() const noexcept { return m_insertions; }
 
 private:
     ObjectSet m_deletions;

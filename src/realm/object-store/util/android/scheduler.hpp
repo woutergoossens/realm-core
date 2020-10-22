@@ -28,11 +28,10 @@
 #include <android/log.h>
 #include <android/looper.h>
 
-#define LOGE(...)                                                                                                    \
-    do {                                                                                                             \
-        fprintf(stderr, __VA_ARGS__);                                                                                \
-        __android_log_print(ANDROID_LOG_ERROR, "REALM", __VA_ARGS__);                                                \
-    } while (0)
+#define LOGE(...) do { \
+    fprintf(stderr, __VA_ARGS__); \
+    __android_log_print(ANDROID_LOG_ERROR, "REALM", __VA_ARGS__); \
+} while (0)
 
 namespace {
 using namespace realm;
@@ -111,10 +110,7 @@ public:
         }
     }
 
-    bool can_deliver_notifications() const noexcept override
-    {
-        return true;
-    }
+    bool can_deliver_notifications() const noexcept override { return true; }
     bool is_on_thread() const noexcept override
     {
         return m_thread == pthread_self();
@@ -133,8 +129,8 @@ private:
 
     // pipe file descriptor pair we use to signal ALooper
     struct {
-        int read = -1;
-        int write = -1;
+      int read = -1;
+      int write = -1;
     } m_message_pipe;
 
     void init()
@@ -162,8 +158,9 @@ private:
             // It still works in blocking mode.
         }
 
-        if (ALooper_addFd(m_looper, message_pipe[0], ALOOPER_POLL_CALLBACK, ALOOPER_EVENT_INPUT, &looper_callback,
-                          this) != 1) {
+        if (ALooper_addFd(m_looper, message_pipe[0], ALOOPER_POLL_CALLBACK,
+                          ALOOPER_EVENT_INPUT,
+                          &looper_callback, this) != 1) {
             LOGE("Error adding WeakRealmNotifier callback to looper.");
             ::close(message_pipe[0]);
             ::close(message_pipe[1]);
@@ -188,10 +185,10 @@ private:
                 }
             }
             if (shared) {
-                // Clear the buffer. Note that there might be a small chance than more than 1024 bytes left in the
-                // pipe, but it is OK. Since we also want to support blocking read here. Clear here instead of in the
-                // notify is because of whenever there are bytes left in the pipe, the ALOOPER_EVENT_INPUT will be
-                // triggered.
+                // Clear the buffer. Note that there might be a small chance than more than 1024 bytes left in the pipe,
+                // but it is OK. Since we also want to support blocking read here.
+                // Clear here instead of in the notify is because of whenever there are bytes left in the pipe, the
+                // ALOOPER_EVENT_INPUT will be triggered.
                 std::vector<uint8_t> buff(1024);
                 read(fd, buff.data(), buff.size());
                 // By holding a shared_ptr, this object won't be destroyed in the m_callback.

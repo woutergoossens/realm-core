@@ -44,7 +44,7 @@ private:
 };
 
 RunLoopScheduler::RunLoopScheduler(CFRunLoopRef run_loop)
-    : m_runloop(run_loop ?: CFRunLoopGetCurrent())
+: m_runloop(run_loop ?: CFRunLoopGetCurrent())
 {
     CFRetain(m_runloop);
 }
@@ -58,7 +58,7 @@ RunLoopScheduler::~RunLoopScheduler()
     CFRelease(m_runloop);
 }
 
-void RunLoopScheduler::set_notify_callback(std::function<void()> callback)
+void RunLoopScheduler::set_notify_callback(std::function<void ()> callback)
 {
     if (m_signal) {
         CFRunLoopSourceInvalidate(m_signal);
@@ -77,8 +77,7 @@ void RunLoopScheduler::set_notify_callback(std::function<void()> callback)
         static_cast<RefCountedRunloopCallback*>(info)->callback();
     };
     ctx.retain = [](const void* info) {
-        static_cast<RefCountedRunloopCallback*>(const_cast<void*>(info))
-            ->ref_count.fetch_add(1, std::memory_order_relaxed);
+        static_cast<RefCountedRunloopCallback*>(const_cast<void*>(info))->ref_count.fetch_add(1, std::memory_order_relaxed);
         return info;
     };
     ctx.release = [](const void* info) {
@@ -142,10 +141,7 @@ public:
 
     bool is_on_thread() const noexcept override;
     bool is_same_as(const Scheduler* other) const noexcept override;
-    bool can_deliver_notifications() const noexcept override
-    {
-        return true;
-    }
+    bool can_deliver_notifications() const noexcept override { return true; }
 
 private:
     dispatch_queue_t m_queue = nullptr;
@@ -155,16 +151,15 @@ private:
 static const void* c_queue_key = &c_queue_key;
 
 DispatchQueueScheduler::DispatchQueueScheduler(dispatch_queue_t queue)
-    : m_queue(queue)
+: m_queue(queue)
 {
     if (__builtin_available(iOS 12.0, macOS 10.14, tvOS 12.0, watchOS 5.0, *)) {
         static auto class_dispatch_queue_serial = objc_getClass("OS_dispatch_queue_serial");
         static auto class_dispatch_queue_main = objc_getClass("OS_dispatch_queue_main");
         auto cls = object_getClass(reinterpret_cast<id>(queue));
         if (cls != class_dispatch_queue_serial && cls != class_dispatch_queue_main) {
-            auto msg = util::format(
-                "Invalid queue '%1' (%2): Realms can only be confined to serial queues or the main queue.",
-                dispatch_queue_get_label(queue) ?: "<nil>", class_getName(cls));
+            auto msg = util::format("Invalid queue '%1' (%2): Realms can only be confined to serial queues or the main queue.",
+                                    dispatch_queue_get_label(queue) ?: "<nil>", class_getName(cls));
             throw std::logic_error(msg);
         }
     }
@@ -186,10 +181,10 @@ void DispatchQueueScheduler::notify()
     dispatch_async(m_queue, m_callback);
 }
 
-void DispatchQueueScheduler::set_notify_callback(std::function<void()> callback)
+void DispatchQueueScheduler::set_notify_callback(std::function<void ()> callback)
 {
     m_callback = Block_copy(^{
-      callback();
+        callback();
     });
 }
 

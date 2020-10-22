@@ -26,9 +26,9 @@ using namespace realm::_impl;
 
 
 WeakRealmNotifier::WeakRealmNotifier(const std::shared_ptr<Realm>& realm, bool cache)
-    : m_realm(realm)
-    , m_realm_key(realm.get())
-    , m_cache(cache)
+: m_realm(realm)
+, m_realm_key(realm.get())
+, m_cache(cache)
 {
     bind_to_scheduler();
 }

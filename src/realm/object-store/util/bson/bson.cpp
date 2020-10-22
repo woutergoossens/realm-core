@@ -17,7 +17,7 @@
  **************************************************************************/
 
 #include <realm/object-store/util/bson/bson.hpp>
-#include <external/json/json.hpp>
+#include <json.hpp>
 #include <sstream>
 #include <stack>
 #include <algorithm>
@@ -49,20 +49,17 @@ Bson::~Bson() noexcept
     }
 }
 
-Bson::Bson(const Bson& v)
-{
+Bson::Bson(const Bson& v) {
     m_type = Type::Null;
     *this = v;
 }
 
-Bson::Bson(Bson&& v) noexcept
-{
+Bson::Bson(Bson&& v) noexcept {
     m_type = Type::Null;
     *this = std::move(v);
 }
 
-Bson& Bson::operator=(Bson&& v) noexcept
-{
+Bson& Bson::operator=(Bson&& v) noexcept {
     if (this == &v)
         return *this;
 
@@ -123,8 +120,7 @@ Bson& Bson::operator=(Bson&& v) noexcept
     return *this;
 }
 
-Bson& Bson::operator=(const Bson& v)
-{
+Bson& Bson::operator=(const Bson& v) {
     if (&v == this)
         return *this;
 
@@ -247,101 +243,115 @@ bool Bson::operator!=(const Bson& other) const
     return !(*this == other);
 }
 
-template <>
+template<>
 bool holds_alternative<util::None>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Null;
 }
 
-template <>
+template<>
 bool holds_alternative<int32_t>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Int32;
 }
 
-template <>
+template<>
 bool holds_alternative<int64_t>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Int64;
 }
 
-template <>
+template<>
 bool holds_alternative<bool>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Bool;
 }
 
-template <>
+template<>
 bool holds_alternative<double>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Double;
 }
 
-template <>
+template<>
 bool holds_alternative<std::string>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::String;
 }
 
-template <>
+template<>
 bool holds_alternative<std::vector<char>>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Binary;
 }
 
-template <>
+template<>
 bool holds_alternative<Timestamp>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Datetime;
 }
 
-template <>
+template<>
 bool holds_alternative<ObjectId>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::ObjectId;
 }
 
-template <>
+template<>
 bool holds_alternative<Decimal128>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Decimal128;
 }
 
-template <>
+template<>
 bool holds_alternative<RegularExpression>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::RegularExpression;
 }
 
-template <>
+template<>
 bool holds_alternative<MinKey>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::MinKey;
 }
 
-template <>
+template<>
 bool holds_alternative<MaxKey>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::MaxKey;
 }
 
-template <>
+template<>
 bool holds_alternative<IndexedMap<Bson>>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Document;
 }
 
-template <>
+template<>
 bool holds_alternative<std::vector<Bson>>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Array;
 }
 
-template <>
+template<>
 bool holds_alternative<MongoTimestamp>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Timestamp;
 }
+
+struct PrecisionGuard {
+    PrecisionGuard(std::ostream& stream, std::streamsize new_precision)
+        : stream(stream)
+        , old_precision(stream.precision(new_precision))
+        {}
+
+    ~PrecisionGuard() {
+        stream.precision(old_precision);
+    }
+
+    std::ostream& stream;
+    std::streamsize old_precision;
+};
 
 std::ostream& operator<<(std::ostream& out, const Bson& b)
 {
@@ -350,33 +360,25 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
             out << "null";
             break;
         case Bson::Type::Int32:
-            out << "{"
-                << "\"$numberInt\""
-                << ":" << '"' << static_cast<int32_t>(b) << '"' << "}";
+            out << "{" << "\"$numberInt\"" << ":" << '"' << static_cast<int32_t>(b) << '"' << "}";
             break;
         case Bson::Type::Int64:
-            out << "{"
-                << "\"$numberLong\""
-                << ":" << '"' << static_cast<int64_t>(b) << '"' << "}";
+            out << "{" << "\"$numberLong\"" << ":" << '"' << static_cast<int64_t>(b) << '"' << "}";
             break;
         case Bson::Type::Bool:
             out << (b ? "true" : "false");
             break;
         case Bson::Type::Double: {
             double d = static_cast<double>(b);
-            out << "{"
-                << "\"$numberDouble\""
-                << ":" << '"';
+            out << "{" << "\"$numberDouble\"" << ":" << '"';
             if (std::isnan(d)) {
                 out << "NaN";
-            }
-            else if (d == std::numeric_limits<double>::infinity()) {
+            } else if (d == std::numeric_limits<double>::infinity()) {
                 out << "Infinity";
-            }
-            else if (d == (-1 * std::numeric_limits<double>::infinity())) {
+            } else if (d == (-1 * std::numeric_limits<double>::infinity())) {
                 out << "-Infinity";
-            }
-            else {
+            } else {
+                PrecisionGuard precision_guard(out, std::numeric_limits<double>::max_digits10);
                 out << d;
             }
             out << '"' << "}";
@@ -387,7 +389,8 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
             break;
         case Bson::Type::Binary: {
             const std::vector<char>& vec = static_cast<std::vector<char>>(b);
-            out << "{\"$binary\":{\"base64\":\"" << std::string(vec.begin(), vec.end()) << "\",\"subType\":\"00\"}}";
+            out << "{\"$binary\":{\"base64\":\"" <<
+            std::string(vec.begin(), vec.end()) << "\",\"subType\":\"00\"}}";
             break;
         }
         case Bson::Type::Timestamp: {
@@ -398,32 +401,26 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
         case Bson::Type::Datetime: {
             auto d = static_cast<realm::Timestamp>(b);
 
-            out << "{\"$date\":{\"$numberLong\":\"" << ((d.get_seconds() * 1000) + d.get_nanoseconds() / 1000000)
+            out << "{\"$date\":{\"$numberLong\":\""
+                << ((d.get_seconds() * 1000) + d.get_nanoseconds()/1000000)
                 << "\"}}";
             break;
         }
         case Bson::Type::ObjectId: {
             const ObjectId& oid = static_cast<ObjectId>(b);
-            out << "{"
-                << "\"$oid\""
-                << ":" << '"' << oid << '"' << "}";
+            out << "{" << "\"$oid\"" << ":" << '"' << oid << '"' << "}";
             break;
         }
         case Bson::Type::Decimal128: {
             const Decimal128& d = static_cast<Decimal128>(b);
-            out << "{"
-                << "\"$numberDecimal\""
-                << ":" << '"';
+            out << "{" << "\"$numberDecimal\"" << ":" << '"';
             if (d.is_nan()) {
                 out << "NaN";
-            }
-            else if (d == Decimal128("Infinity")) {
+            } else if (d == Decimal128("Infinity")) {
                 out << "Infinity";
-            }
-            else if (d == Decimal128("-Infinity")) {
+            } else if (d == Decimal128("-Infinity")) {
                 out << "-Infinity";
-            }
-            else {
+            } else {
                 out << d;
             }
             out << '"' << "}";
@@ -431,8 +428,8 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
         }
         case Bson::Type::RegularExpression: {
             const RegularExpression& regex = static_cast<RegularExpression>(b);
-            out << "{\"$regularExpression\":{\"pattern\":\"" << regex.pattern() << "\",\"options\":\""
-                << regex.options() << "\"}}";
+            out << "{\"$regularExpression\":{\"pattern\":\"" << regex.pattern()
+            << "\",\"options\":\"" << regex.options() << "\"}}";
             break;
         }
         case Bson::Type::MaxKey:
@@ -471,8 +468,7 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
     return out;
 }
 
-std::string Bson::toJson() const
-{
+std::string Bson::toJson() const {
     std::stringstream s;
     s << *this;
     return s.str();
@@ -481,15 +477,14 @@ std::string Bson::toJson() const
 namespace {
 
 struct BsonError : public std::runtime_error {
-    BsonError(std::string message)
-        : std::runtime_error(std::move(message))
+    BsonError(std::string message) : std::runtime_error(std::move(message))
     {
     }
 };
 
 namespace {
 // This implements just enough of the map API to support nlohmann's DOM apis that we use.
-template <typename K, typename V, typename... Ignored>
+template <typename K, typename V, typename ...Ignored>
 struct LinearMap {
     using key_type = K;
     using mapped_type = V;
@@ -498,50 +493,26 @@ struct LinearMap {
     using iterator = typename storage_type::iterator;
     using const_iterator = typename storage_type::const_iterator;
 
-    auto begin()
-    {
-        return _elems.begin();
-    }
-    auto begin() const
-    {
-        return _elems.begin();
-    }
-    auto end()
-    {
-        return _elems.end();
-    }
-    auto end() const
-    {
-        return _elems.end();
-    }
-    auto size() const
-    {
-        return _elems.size();
-    }
-    auto max_size() const
-    {
-        return _elems.max_size();
-    }
-    auto clear()
-    {
-        return _elems.clear();
-    }
-    V& operator[](const K& k)
-    {
+    auto begin() { return _elems.begin(); }
+    auto begin() const { return _elems.begin(); }
+    auto end() { return _elems.end(); }
+    auto end() const { return _elems.end(); }
+    auto size() const { return _elems.size(); }
+    auto max_size() const { return _elems.max_size(); }
+    auto clear() { return _elems.clear(); }
+    V& operator[](const K& k) {
         // assume this is only used for adding a new element.
         return _elems.emplace_back(k, V()).second;
     }
 
     template <typename... Args>
-    std::pair<iterator, bool> emplace(Args&&... args)
-    {
+    std::pair<iterator, bool> emplace(Args&&... args) {
         // assume this is only used for adding a new element.
         _elems.emplace_back(std::forward<Args>(args)...);
         return {--_elems.end(), true};
     }
 
-    iterator erase(iterator)
-    {
+    iterator erase(iterator) {
         // This is only used when mutating the DOM which we don't do.
         REALM_TERMINATE("LinearMap::erase() should never be called");
     }
@@ -553,8 +524,7 @@ using Json = nlohmann::basic_json<LinearMap>;
 
 Bson dom_obj_to_bson(const Json& json);
 
-Bson dom_elem_to_bson(const Json& json)
-{
+Bson dom_elem_to_bson(const Json& json) {
     switch (json.type()) {
         case Json::value_t::null:
             return Bson();
@@ -588,103 +558,72 @@ Bson dom_elem_to_bson(const Json& json)
 }
 
 // This works around the deleted rvalue constructor in StringData
-inline StringData tosd(const std::string& s)
-{
-    return s;
-}
+inline StringData tosd(const std::string& s) { return s; }
 
 // Keep these sorted by key. This is checked so you can't forget.
-using FancyParser = Bson (*)(const Json& json);
+using FancyParser = Bson(*)(const Json& json);
 static constexpr std::pair<std::string_view, FancyParser> bson_fancy_parsers[] = {
-    {"$binary",
-     +[](const Json& json) {
-         util::Optional<std::vector<char>> base64;
-         util::Optional<uint8_t> subType;
-         if (json.size() != 2)
-             throw BsonError("invalid extended json $binary");
-         for (auto&& [k, v] : json.items()) {
-             if (k == "base64") {
-                 const std::string& str = v.get<std::string>();
-                 base64.emplace(str.begin(), str.end());
-             }
-             else if (k == "subType") {
-                 subType = uint8_t(std::stoul(v.get<std::string>(), nullptr, 16));
-             }
-         }
-         if (!base64 || !subType)
-             throw BsonError("invalid extended json $binary");
-         return Bson(std::move(*base64)); // TODO don't throw away the subType.
-     }},
-    {"$date",
-     +[](const Json& json) {
-         int64_t millis_since_epoch = dom_elem_to_bson(json).operator int64_t();
-         return Bson(realm::Timestamp(millis_since_epoch / 1000,
-                                      (millis_since_epoch % 1000) * 1'000'000)); // ms -> ns
-     }},
-    {"$maxKey",
-     +[](const Json&) {
-         return Bson(MaxKey());
-     }},
-    {"$minKey",
-     +[](const Json&) {
-         return Bson(MinKey());
-     }},
-    {"$numberDecimal",
-     +[](const Json& json) {
-         return Bson(Decimal128(tosd(json.get<std::string>())));
-     }},
-    {"$numberDouble",
-     +[](const Json& json) {
-         return Bson(std::stod(json.get<std::string>()));
-     }},
-    {"$numberInt",
-     +[](const Json& json) {
-         return Bson(int32_t(std::stoi(json.get<std::string>())));
-     }},
-    {"$numberLong",
-     +[](const Json& json) {
-         return Bson(int64_t(std::stoll(json.get<std::string>())));
-     }},
-    {"$oid",
-     +[](const Json& json) {
-         return Bson(ObjectId(json.get<std::string>().c_str()));
-     }},
-    {"$regularExpression",
-     +[](const Json& json) {
-         util::Optional<std::string> pattern;
-         util::Optional<std::string> options;
-         if (json.size() != 2)
-             throw BsonError("invalid extended json $binary");
-         for (auto&& [k, v] : json.items()) {
-             if (k == "pattern") {
-                 pattern = v.get<std::string>();
-             }
-             else if (k == "options") {
-                 options = v.get<std::string>();
-             }
-         }
-         if (!pattern || !options)
-             throw BsonError("invalid extended json $binary");
-         return Bson(RegularExpression(std::move(*pattern), std::move(*options)));
-     }},
-    {"$timestamp",
-     +[](const Json& json) {
-         util::Optional<uint32_t> t;
-         util::Optional<uint32_t> i;
-         if (json.size() != 2)
-             throw BsonError("invalid extended json $timestamp");
-         for (auto&& [k, v] : json.items()) {
-             if (k == "t") {
-                 t = v.get<uint32_t>();
-             }
-             else if (k == "i") {
-                 i = v.get<uint32_t>();
-             }
-         }
-         if (!t || !i)
-             throw BsonError("invalid extended json $timestamp");
-         return Bson(MongoTimestamp(*t, *i));
-     }},
+    {"$binary", +[](const Json& json) {
+        util::Optional<std::vector<char>> base64;
+        util::Optional<uint8_t> subType;
+        if (json.size() != 2)
+            throw BsonError("invalid extended json $binary");
+        for (auto&& [k, v] : json.items()) {
+            if (k == "base64") {
+                const std::string& str = v.get<std::string>();
+                base64.emplace(str.begin(), str.end());
+            } else if (k == "subType") {
+                subType = std::stoul(v.get<std::string>(), nullptr, 16);
+            }
+        }
+        if (!base64 || !subType)
+            throw BsonError("invalid extended json $binary");
+        return Bson(std::move(*base64)); // TODO don't throw away the subType.
+    }},
+    {"$date", +[](const Json& json) {
+        int64_t millis_since_epoch = dom_elem_to_bson(json).operator int64_t();
+        return Bson(realm::Timestamp(millis_since_epoch / 1000,
+                                     (millis_since_epoch % 1000) * 1'000'000)); // ms -> ns
+    }},
+    {"$maxKey", +[](const Json&) { return Bson(MaxKey()); }},
+    {"$minKey", +[](const Json&) { return Bson(MinKey()); }},
+    {"$numberDecimal", +[](const Json& json) { return Bson(Decimal128(tosd(json.get<std::string>()))); }},
+    {"$numberDouble", +[](const Json& json) { return Bson(std::stod(json.get<std::string>())); }},
+    {"$numberInt", +[](const Json& json) { return Bson(int32_t(std::stoi(json.get<std::string>()))); }},
+    {"$numberLong", +[](const Json& json) { return Bson(int64_t(std::stoll(json.get<std::string>()))); }},
+    {"$oid", +[](const Json& json) { return Bson(ObjectId(json.get<std::string>().c_str())); }},
+    {"$regularExpression", +[](const Json& json) {
+        util::Optional<std::string> pattern;
+        util::Optional<std::string> options;
+        if (json.size() != 2)
+            throw BsonError("invalid extended json $binary");
+        for (auto&& [k, v] : json.items()) {
+            if (k == "pattern") {
+                pattern = v.get<std::string>();
+            } else if (k == "options") {
+                options = v.get<std::string>();
+            }
+        }
+        if (!pattern || !options)
+            throw BsonError("invalid extended json $binary");
+        return Bson(RegularExpression(std::move(*pattern), std::move(*options)));
+    }},
+    {"$timestamp", +[](const Json& json) {
+        util::Optional<uint32_t> t;
+        util::Optional<uint32_t> i;
+        if (json.size() != 2)
+            throw BsonError("invalid extended json $timestamp");
+        for (auto&& [k, v] : json.items()) {
+            if (k == "t") {
+                t = v.get<uint32_t>();
+            } else if (k == "i") {
+                i = v.get<uint32_t>();
+            }
+        }
+        if (!t || !i)
+            throw BsonError("invalid extended json $timestamp");
+        return Bson(MongoTimestamp(*t, *i));
+    }},
 };
 
 constexpr auto parser_comp = [](const std::pair<std::string_view, FancyParser>& lhs,
@@ -701,13 +640,14 @@ constexpr auto parser_comp = [](const std::pair<std::string_view, FancyParser>& 
 }();
 #endif
 
-Bson dom_obj_to_bson(const Json& json)
-{
+Bson dom_obj_to_bson(const Json& json) {
     if (json.size() == 1) {
         const auto& [key, value] = json.items().begin();
         if (key[0] == '$') {
-            auto it = std::lower_bound(std::begin(bson_fancy_parsers), std::end(bson_fancy_parsers),
-                                       std::pair<std::string_view, FancyParser>(key, nullptr), parser_comp);
+            auto it = std::lower_bound(std::begin(bson_fancy_parsers),
+                                       std::end(bson_fancy_parsers),
+                                       std::pair<std::string_view, FancyParser>(key, nullptr),
+                                       parser_comp);
             if (it != std::end(bson_fancy_parsers) && it->first == key) {
                 return it->second(value);
             }
@@ -720,12 +660,11 @@ Bson dom_obj_to_bson(const Json& json)
     }
     return out;
 }
-} // namespace
+}
 
 } // anonymous namespace
 
-Bson parse(const std::string_view& json)
-{
+Bson parse(const std::string_view& json) {
     return dom_elem_to_bson(Json::parse(json));
 }
 

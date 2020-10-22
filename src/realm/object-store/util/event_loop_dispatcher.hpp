@@ -19,7 +19,7 @@
 #ifndef REALM_OS_UTIL_EVENT_LOOP_DISPATCHER_HPP
 #define REALM_OS_UTIL_EVENT_LOOP_DISPATCHER_HPP
 
-#include <realm/object-store/util/scheduler.hpp>
+#include "util/scheduler.hpp"
 
 #include <mutex>
 #include <queue>
@@ -35,11 +35,10 @@ class EventLoopDispatcher;
 template <typename... Args>
 class EventLoopDispatcher<void(Args...)> {
     using Tuple = std::tuple<typename std::remove_reference<Args>::type...>;
-
 private:
     struct State {
         State(std::function<void(Args...)> func)
-            : func(std::move(func))
+        : func(std::move(func))
         {
         }
 
@@ -53,7 +52,7 @@ private:
 
 public:
     EventLoopDispatcher(std::function<void(Args...)> func)
-        : m_state(std::make_shared<State>(std::move(func)))
+    : m_state(std::make_shared<State>(std::move(func)))
     {
         m_scheduler->set_notify_callback([state = m_state] {
             std::unique_lock<std::mutex> lock(state->mutex);
@@ -69,10 +68,7 @@ public:
         });
     }
 
-    const std::function<void(Args...)>& func() const
-    {
-        return m_state->func;
-    }
+    const std::function<void(Args...)>& func() const { return m_state->func; }
 
     void operator()(Args... args)
     {
@@ -92,38 +88,37 @@ public:
 
 namespace _impl::ForEventLoopDispatcher {
 template <typename Sig>
-struct ExtractSignatureImpl {
-};
+struct ExtractSignatureImpl {};
 template <typename T, typename... Args>
-struct ExtractSignatureImpl<void (T::*)(Args...)> {
+struct ExtractSignatureImpl<void(T::*)(Args...)> {
     using signature = void(Args...);
 };
 template <typename T, typename... Args>
-struct ExtractSignatureImpl<void (T::*)(Args...) const> {
+struct ExtractSignatureImpl<void(T::*)(Args...) const> {
     using signature = void(Args...);
 };
 template <typename T, typename... Args>
-struct ExtractSignatureImpl<void (T::*)(Args...)&> {
+struct ExtractSignatureImpl<void(T::*)(Args...) &> {
     using signature = void(Args...);
 };
 template <typename T, typename... Args>
-struct ExtractSignatureImpl<void (T::*)(Args...) const&> {
+struct ExtractSignatureImpl<void(T::*)(Args...) const &> {
     using signature = void(Args...);
 };
 template <typename T, typename... Args>
-struct ExtractSignatureImpl<void (T::*)(Args...) noexcept> {
+struct ExtractSignatureImpl<void(T::*)(Args...) noexcept> {
     using signature = void(Args...);
 };
 template <typename T, typename... Args>
-struct ExtractSignatureImpl<void (T::*)(Args...) const noexcept> {
+struct ExtractSignatureImpl<void(T::*)(Args...) const noexcept> {
     using signature = void(Args...);
 };
 template <typename T, typename... Args>
-struct ExtractSignatureImpl<void (T::*)(Args...) & noexcept> {
+struct ExtractSignatureImpl<void(T::*)(Args...) & noexcept> {
     using signature = void(Args...);
 };
 template <typename T, typename... Args>
-struct ExtractSignatureImpl<void (T::*)(Args...) const& noexcept> {
+struct ExtractSignatureImpl<void(T::*)(Args...) const & noexcept> {
     using signature = void(Args...);
 };
 // Note: no && specializations since std::function doesn't support them, so you can't construct an EventLoopDispatcher
@@ -134,16 +129,17 @@ using ExtractSignature = typename ExtractSignatureImpl<T>::signature;
 } // namespace _impl::ForEventLoopDispatcher
 
 // Deduction guide for function pointers.
-template <typename... Args>
-EventLoopDispatcher(void (*)(Args...))->EventLoopDispatcher<void(Args...)>;
+template<typename... Args>
+EventLoopDispatcher(void(*)(Args...)) -> EventLoopDispatcher<void(Args...)>;
 
 // Deduction guide for callable objects, such as lambdas. Only supports types with a non-overloaded, non-templated
 // call operator, so no polymorphic (auto argument) lambdas.
-template <typename T, typename Sig = _impl::ForEventLoopDispatcher::ExtractSignature<decltype(&T::operator())>>
-EventLoopDispatcher(const T&)->EventLoopDispatcher<Sig>;
+template<typename T, typename Sig = _impl::ForEventLoopDispatcher::ExtractSignature<decltype(&T::operator())>>
+EventLoopDispatcher(const T&) -> EventLoopDispatcher<Sig>;
 
 
 } // namespace util
 } // namespace realm
 
 #endif
+

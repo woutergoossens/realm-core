@@ -16,28 +16,27 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <realm/object-store/sync/sync_user.hpp>
+#include "sync/sync_user.hpp"
 
-#include <realm/object-store/sync/app_credentials.hpp>
-#include <realm/object-store/sync/generic_network_transport.hpp>
-#include <realm/object-store/sync/impl/sync_metadata.hpp>
-#include <realm/object-store/sync/sync_manager.hpp>
-#include <realm/object-store/sync/sync_session.hpp>
+#include "sync/app_credentials.hpp"
+#include "sync/generic_network_transport.hpp"
+#include "sync/impl/sync_metadata.hpp"
+#include "sync/mongo_client.hpp"
+#include "sync/sync_manager.hpp"
+#include "sync/sync_session.hpp"
 
 #include <realm/util/base64.hpp>
 
 namespace realm {
 
-static std::string base64_decode(const std::string& in)
-{
+static std::string base64_decode(const std::string &in) {
     std::string out;
     out.resize(util::base64_decoded_size(in.size()));
     util::base64_decode(in, &out[0], out.size());
     return out;
 }
 
-static std::vector<std::string> split_token(const std::string& jwt)
-{
+static std::vector<std::string> split_token(const std::string& jwt) {
     constexpr static char delimiter = '.';
 
     std::vector<std::string> parts;
@@ -66,50 +65,58 @@ RealmJWT::RealmJWT(std::string&& token)
     auto json_str = base64_decode(parts[1]);
     auto json = static_cast<bson::BsonDocument>(bson::parse(json_str));
 
-    this->expires_at = long(static_cast<int64_t>(json["exp"]));
-    this->issued_at = long(static_cast<int64_t>(json["iat"]));
+    this->expires_at = static_cast<int64_t>(json["exp"]);
+    this->issued_at = static_cast<int64_t>(json["iat"]);
 
     if (json.find("user_data") != json.end()) {
         this->user_data = static_cast<bson::BsonDocument>(json["user_data"]);
     }
 }
 
-SyncUserProfile::SyncUserProfile(util::Optional<std::string> name, util::Optional<std::string> email,
-                                 util::Optional<std::string> picture_url, util::Optional<std::string> first_name,
-                                 util::Optional<std::string> last_name, util::Optional<std::string> gender,
-                                 util::Optional<std::string> birthday, util::Optional<std::string> min_age,
+SyncUserProfile::SyncUserProfile(util::Optional<std::string> name,
+                                 util::Optional<std::string> email,
+                                 util::Optional<std::string> picture_url,
+                                 util::Optional<std::string> first_name,
+                                 util::Optional<std::string> last_name,
+                                 util::Optional<std::string> gender,
+                                 util::Optional<std::string> birthday,
+                                 util::Optional<std::string> min_age,
                                  util::Optional<std::string> max_age)
-    : name(std::move(name))
-    , email(std::move(email))
-    , picture_url(std::move(picture_url))
-    , first_name(std::move(first_name))
-    , last_name(std::move(last_name))
-    , gender(std::move(gender))
-    , birthday(std::move(birthday))
-    , min_age(std::move(min_age))
-    , max_age(std::move(max_age))
+: name(std::move(name))
+, email(std::move(email))
+, picture_url(std::move(picture_url))
+, first_name(std::move(first_name))
+, last_name(std::move(last_name))
+, gender(std::move(gender))
+, birthday(std::move(birthday))
+, min_age(std::move(min_age))
+, max_age(std::move(max_age))
 {
 }
 
 SyncUserIdentity::SyncUserIdentity(const std::string& id, const std::string& provider_type)
-    : id(id)
-    , provider_type(provider_type)
+: id(id)
+, provider_type(provider_type)
 {
 }
 
 SyncUserContextFactory SyncUser::s_binding_context_factory;
 std::mutex SyncUser::s_binding_context_factory_mutex;
 
-SyncUser::SyncUser(std::string refresh_token, const std::string identity, const std::string provider_type,
-                   std::string access_token, SyncUser::State state, const std::string device_id,
+SyncUser::SyncUser(std::string refresh_token,
+                   const std::string identity,
+                   const std::string provider_type,
+                   std::string access_token,
+                   SyncUser::State state,
+                   const std::string device_id,
                    std::shared_ptr<SyncManager> sync_manager)
-    : m_state(state)
-    , m_provider_type(provider_type)
-    , m_refresh_token(RealmJWT(std::move(refresh_token)))
-    , m_identity(std::move(identity))
-    , m_access_token(RealmJWT(std::move(access_token)))
-    , m_device_id(device_id)
-    , m_sync_manager(sync_manager)
+: m_state(state)
+, m_provider_type(provider_type)
+, m_refresh_token(RealmJWT(std::move(refresh_token)))
+, m_identity(std::move(identity))
+, m_access_token(RealmJWT(std::move(access_token)))
+, m_device_id(device_id)
+, m_sync_manager(sync_manager)
 {
     {
         std::lock_guard<std::mutex> lock(s_binding_context_factory_mutex);
@@ -400,6 +407,11 @@ void SyncUser::register_session(std::shared_ptr<SyncSession> session)
     }
 }
 
+app::MongoClient SyncUser::mongo_client(const std::string& service_name)
+{
+    return app::MongoClient(shared_from_this(), m_sync_manager->app().lock(), service_name);
+}
+
 void SyncUser::set_binding_context_factory(SyncUserContextFactory factory)
 {
     std::lock_guard<std::mutex> lock(s_binding_context_factory_mutex);
@@ -410,8 +422,7 @@ void SyncUser::refresh_custom_data(std::function<void(util::Optional<app::AppErr
 {
     if (auto app = m_sync_manager->app().lock()) {
         app->refresh_custom_data(shared_from_this(), completion_block);
-    }
-    else {
+    } else {
         completion_block(app::AppError(app::make_client_error_code(app::ClientErrorCode::app_deallocated),
                                        "App has been deallocated"));
     }
@@ -423,4 +434,4 @@ size_t hash<realm::SyncUserIdentity>::operator()(const realm::SyncUserIdentity& 
 {
     return ((hash<string>()(k.id) ^ (hash<string>()(k.provider_type) << 1)) >> 1);
 }
-} // namespace std
+}

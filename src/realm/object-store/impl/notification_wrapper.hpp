@@ -19,7 +19,7 @@
 #ifndef REALM_OS_NOTIFICATION_WRAPPER_HPP
 #define REALM_OS_NOTIFICATION_WRAPPER_HPP
 
-#include <realm/object-store/collection_notifications.hpp>
+#include "collection_notifications.hpp"
 
 namespace realm {
 namespace _impl {
@@ -27,14 +27,13 @@ namespace _impl {
 // A wrapper that stores a value and an associated notification token.
 // The point of this type is to keep the notification token alive
 // until the value can be properly processed or handled.
-template <typename T>
+template<typename T>
 struct NotificationWrapper : public T {
     using T::T;
 
     NotificationWrapper(T&& object)
-        : T(object)
-    {
-    }
+    : T(object)
+    { }
 
     template <typename F>
     void add_notification_callback(F&& callback)

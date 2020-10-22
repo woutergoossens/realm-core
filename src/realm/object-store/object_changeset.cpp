@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <realm/object-store/object_changeset.hpp>
+#include "object_changeset.hpp"
 
 using namespace realm;
 
@@ -146,3 +146,4 @@ void ObjectChangeSet::verify()
     }
 #endif
 }
+

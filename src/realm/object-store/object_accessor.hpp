@@ -19,24 +19,29 @@
 #ifndef REALM_OS_OBJECT_ACCESSOR_HPP
 #define REALM_OS_OBJECT_ACCESSOR_HPP
 
-#include <realm/object-store/object.hpp>
+#include "object.hpp"
 
-#include <realm/object-store/feature_checks.hpp>
-#include <realm/object-store/list.hpp>
-#include <realm/object-store/object_schema.hpp>
-#include <realm/object-store/object_store.hpp>
-#include <realm/object-store/results.hpp>
-#include <realm/object-store/schema.hpp>
-#include <realm/object-store/shared_realm.hpp>
+#include "feature_checks.hpp"
+#include "list.hpp"
+#include "object_schema.hpp"
+#include "object_store.hpp"
+#include "results.hpp"
+#include "schema.hpp"
+#include "shared_realm.hpp"
 
 #include <realm/util/assert.hpp>
 #include <realm/table_view.hpp>
+
+#if REALM_ENABLE_SYNC
+#include <realm/sync/object.hpp>
+#endif // REALM_ENABLE_SYNC
 
 #include <string>
 
 namespace realm {
 template <typename ValueType, typename ContextType>
-void Object::set_property_value(ContextType& ctx, StringData prop_name, ValueType value, CreatePolicy policy)
+void Object::set_property_value(ContextType& ctx, StringData prop_name,
+                                ValueType value, CreatePolicy policy)
 {
     auto& property = property_for_name(prop_name);
     validate_property_for_setter(property);
@@ -86,7 +91,7 @@ struct ValueUpdater {
         }
     }
 
-    template <typename T>
+    template<typename T>
     void operator()(T*)
     {
         auto new_val = ctx.template unbox<T>(value);
@@ -95,11 +100,11 @@ struct ValueUpdater {
         }
     }
 };
-} // namespace
+}
 
 template <typename ValueType, typename ContextType>
-void Object::set_property_value_impl(ContextType& ctx, const Property& property, ValueType value, CreatePolicy policy,
-                                     bool is_default)
+void Object::set_property_value_impl(ContextType& ctx, const Property &property,
+                                     ValueType value, CreatePolicy policy, bool is_default)
 {
     ctx.will_change(*this, property);
 
@@ -130,13 +135,14 @@ void Object::set_property_value_impl(ContextType& ctx, const Property& property,
         return;
     }
 
-    ValueUpdater<ValueType, ContextType> updater{ctx, property, value, m_obj, col, policy, is_default};
+    ValueUpdater<ValueType, ContextType> updater{ctx, property, value,
+        m_obj, col, policy, is_default};
     switch_on_type(property.type, updater);
     ctx.did_change();
 }
 
 template <typename ValueType, typename ContextType>
-ValueType Object::get_property_value_impl(ContextType& ctx, const Property& property) const
+ValueType Object::get_property_value_impl(ContextType& ctx, const Property &property) const
 {
     verify_attached();
 
@@ -147,33 +153,20 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property& prop
         return ctx.box(List(m_realm, m_obj, column));
 
     switch (property.type & ~PropertyType::Flags) {
-        case PropertyType::Bool:
-            return ctx.box(m_obj.get<bool>(column));
-        case PropertyType::Int:
-            return is_nullable(property.type) ? ctx.box(*m_obj.get<util::Optional<int64_t>>(column))
-                                              : ctx.box(m_obj.get<int64_t>(column));
-        case PropertyType::Float:
-            return ctx.box(m_obj.get<float>(column));
-        case PropertyType::Double:
-            return ctx.box(m_obj.get<double>(column));
-        case PropertyType::String:
-            return ctx.box(m_obj.get<StringData>(column));
-        case PropertyType::Data:
-            return ctx.box(m_obj.get<BinaryData>(column));
-        case PropertyType::Date:
-            return ctx.box(m_obj.get<Timestamp>(column));
-        case PropertyType::ObjectId:
-            return is_nullable(property.type) ? ctx.box(m_obj.get<util::Optional<ObjectId>>(column))
-                                              : ctx.box(m_obj.get<ObjectId>(column));
-        case PropertyType::Decimal:
-            return ctx.box(m_obj.get<Decimal>(column));
-            //        case PropertyType::Any:    return ctx.box(m_obj.get<Mixed>(column));
-        case PropertyType::UUID:
-            return is_nullable(property.type) ? ctx.box(m_obj.get<util::Optional<UUID>>(column))
-                                              : ctx.box(m_obj.get<UUID>(column));
+        case PropertyType::Bool:   return ctx.box(m_obj.get<bool>(column));
+        case PropertyType::Int:    return is_nullable(property.type) ? ctx.box(*m_obj.get<util::Optional<int64_t>>(column)) : ctx.box(m_obj.get<int64_t>(column));
+        case PropertyType::Float:  return ctx.box(m_obj.get<float>(column));
+        case PropertyType::Double: return ctx.box(m_obj.get<double>(column));
+        case PropertyType::String: return ctx.box(m_obj.get<StringData>(column));
+        case PropertyType::Data:   return ctx.box(m_obj.get<BinaryData>(column));
+        case PropertyType::Date:   return ctx.box(m_obj.get<Timestamp>(column));
+        case PropertyType::ObjectId: return is_nullable(property.type) ? ctx.box(m_obj.get<util::Optional<ObjectId>>(column)) : ctx.box(m_obj.get<ObjectId>(column));
+        case PropertyType::Decimal:  return ctx.box(m_obj.get<Decimal>(column));
+//        case PropertyType::Any:    return ctx.box(m_obj.get<Mixed>(column));
         case PropertyType::Object: {
             auto linkObjectSchema = m_realm->schema().find(property.object_type);
-            return ctx.box(Object(m_realm, *linkObjectSchema, const_cast<Obj&>(m_obj).get_linked_object(column)));
+            return ctx.box(Object(m_realm, *linkObjectSchema,
+                                  const_cast<Obj&>(m_obj).get_linked_object(column)));
         }
         case PropertyType::LinkingObjects: {
             auto target_object_schema = m_realm->schema().find(property.object_type);
@@ -182,13 +175,13 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property& prop
             auto tv = const_cast<Obj&>(m_obj).get_backlink_view(table, ColKey(link_property->column_key));
             return ctx.box(Results(m_realm, std::move(tv)));
         }
-        default:
-            REALM_UNREACHABLE();
+        default: REALM_UNREACHABLE();
     }
 }
 
-template <typename ValueType, typename ContextType>
-Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm, StringData object_type, ValueType value,
+template<typename ValueType, typename ContextType>
+Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
+                      StringData object_type, ValueType value,
                       CreatePolicy policy, ObjKey current_obj, Obj* out_row)
 {
     auto object_schema = realm->schema().find(object_type);
@@ -196,7 +189,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm, Str
     return create(ctx, realm, *object_schema, value, policy, current_obj, out_row);
 }
 
-template <typename ValueType, typename ContextType>
+template<typename ValueType, typename ContextType>
 Mixed as_mixed(ContextType& ctx, ValueType& value, PropertyType type)
 {
     if (!value)
@@ -206,9 +199,10 @@ Mixed as_mixed(ContextType& ctx, ValueType& value, PropertyType type)
     });
 }
 
-template <typename ValueType, typename ContextType>
-Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm, ObjectSchema const& object_schema,
-                      ValueType value, CreatePolicy policy, ObjKey current_obj, Obj* out_row)
+template<typename ValueType, typename ContextType>
+Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
+                      ObjectSchema const& object_schema, ValueType value,
+                      CreatePolicy policy, ObjKey current_obj, Obj* out_row)
 {
     realm->verify_in_write();
 
@@ -229,8 +223,8 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm, Obj
     // same primary key already exists. If it does, we either update that object
     // or throw an exception if updating is disabled.
     if (auto primary_prop = object_schema.primary_key_property()) {
-        auto primary_value =
-            ctx.value_for_property(value, *primary_prop, primary_prop - &object_schema.persisted_properties[0]);
+        auto primary_value = ctx.value_for_property(value, *primary_prop,
+                                                    primary_prop - &object_schema.persisted_properties[0]);
         if (!primary_value)
             primary_value = ctx.default_value_for_property(object_schema, *primary_prop);
         if (!primary_value && !is_nullable(primary_prop->type))
@@ -253,9 +247,8 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm, Obj
             obj = table->create_object_with_primary_key(as_mixed(ctx, primary_value, primary_prop->type), &created);
             if (!created && !policy.update) {
                 if (!realm->is_in_migration()) {
-                    throw std::logic_error(util::format(
-                        "Attempting to create an object of type '%1' with an existing primary key value '%2'.",
-                        object_schema.name, ctx.print(*primary_value)));
+                    throw std::logic_error(util::format("Attempting to create an object of type '%1' with an existing primary key value '%2'.",
+                                                        object_schema.name, ctx.print(*primary_value)));
                 }
                 table->set_primary_key_column(ColKey{});
                 skip_primary = false;
@@ -312,18 +305,19 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm, Obj
     return object;
 }
 
-template <typename ValueType, typename ContextType>
-Object Object::get_for_primary_key(ContextType& ctx, std::shared_ptr<Realm> const& realm, StringData object_type,
-                                   ValueType primary_value)
+template<typename ValueType, typename ContextType>
+Object Object::get_for_primary_key(ContextType& ctx, std::shared_ptr<Realm> const& realm,
+                      StringData object_type, ValueType primary_value)
 {
     auto object_schema = realm->schema().find(object_type);
     REALM_ASSERT(object_schema != realm->schema().end());
     return get_for_primary_key(ctx, realm, *object_schema, primary_value);
 }
 
-template <typename ValueType, typename ContextType>
+template<typename ValueType, typename ContextType>
 Object Object::get_for_primary_key(ContextType& ctx, std::shared_ptr<Realm> const& realm,
-                                   const ObjectSchema& object_schema, ValueType primary_value)
+                                   const ObjectSchema &object_schema,
+                                   ValueType primary_value)
 {
     auto primary_prop = object_schema.primary_key_property();
     if (!primary_prop) {
@@ -345,32 +339,26 @@ Object Object::get_for_primary_key(ContextType& ctx, std::shared_ptr<Realm> cons
     return Object(realm, object_schema, key ? table->get_object(key) : Obj{});
 }
 
-template <typename ValueType, typename ContextType>
-ObjKey Object::get_for_primary_key_in_migration(ContextType& ctx, Table const& table, const Property& primary_prop,
-                                                ValueType&& primary_value)
-{
+template<typename ValueType, typename ContextType>
+ObjKey Object::get_for_primary_key_in_migration(ContextType& ctx, Table const& table,
+                                                const Property& primary_prop,
+                                                ValueType&& primary_value) {
     bool is_null = ctx.is_null(primary_value);
     if (is_null && !is_nullable(primary_prop.type))
         throw std::logic_error("Invalid null value for non-nullable primary key.");
     if (primary_prop.type == PropertyType::String) {
-        return table.find_first(primary_prop.column_key, ctx.template unbox<StringData>(primary_value));
+        return table.find_first(primary_prop.column_key,
+                                ctx.template unbox<StringData>(primary_value));
     }
     if (primary_prop.type == PropertyType::ObjectId) {
-        if (is_nullable(primary_prop.type)) {
-            return table.find_first(primary_prop.column_key,
-                                    ctx.template unbox<util::Optional<ObjectId>>(primary_value));
-        }
-        return table.find_first(primary_prop.column_key, ctx.template unbox<ObjectId>(primary_value));
-    }
-    else if (primary_prop.type == PropertyType::UUID) {
-        if (is_nullable(primary_prop.type)) {
-            return table.find_primary_key(ctx.template unbox<util::Optional<UUID>>(primary_value));
-        }
-        return table.find_primary_key(ctx.template unbox<UUID>(primary_value));
+        return table.find_first(primary_prop.column_key,
+                                ctx.template unbox<ObjectId>(primary_value));
     }
     if (is_nullable(primary_prop.type))
-        return table.find_first(primary_prop.column_key, ctx.template unbox<util::Optional<int64_t>>(primary_value));
-    return table.find_first(primary_prop.column_key, ctx.template unbox<int64_t>(primary_value));
+        return table.find_first(primary_prop.column_key,
+                                ctx.template unbox<util::Optional<int64_t>>(primary_value));
+    return table.find_first(primary_prop.column_key,
+                            ctx.template unbox<int64_t>(primary_value));
 }
 
 } // namespace realm

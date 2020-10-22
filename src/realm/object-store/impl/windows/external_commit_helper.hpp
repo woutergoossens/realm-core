@@ -26,56 +26,50 @@ namespace _impl {
 class RealmCoordinator;
 
 namespace win32 {
-template <class T, void (*Initializer)(T&)>
-class SharedMemory {
-public:
-    SharedMemory(LPCWSTR name)
-    {
+    template <class T, void (*Initializer)(T&)>
+    class SharedMemory {
+    public:
+        SharedMemory(LPCWSTR name) {
 #if REALM_WINDOWS
-        HANDLE mapping = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(T), name);
-        auto error = GetLastError();
-        if (mapping != NULL)
-            m_memory = reinterpret_cast<T*>(MapViewOfFile(mapping, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(T)));
+            HANDLE mapping = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(T), name);
+            auto error = GetLastError();
+            if (mapping != NULL)
+                m_memory = reinterpret_cast<T*>(MapViewOfFile(mapping, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(T)));
 #elif REALM_UWP
-        HANDLE mapping = CreateFileMappingFromApp(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, sizeof(T), name);
-        auto error = GetLastError();
-        if (mapping != NULL)
-            m_memory = reinterpret_cast<T*>(MapViewOfFileFromApp(mapping, FILE_MAP_ALL_ACCESS, 0, sizeof(T)));
+            HANDLE mapping = CreateFileMappingFromApp(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, sizeof(T), name);
+            auto error = GetLastError();
+            if (mapping != NULL)
+                m_memory = reinterpret_cast<T*>(MapViewOfFileFromApp(mapping, FILE_MAP_ALL_ACCESS, 0, sizeof(T)));
 #endif
 
-        if (mapping) {
-            // we can close the handle we own because the view has now referenced it
-            CloseHandle(mapping);
+            if (mapping) {
+                // we can close the handle we own because the view has now referenced it
+                CloseHandle(mapping);
+            }
+
+            try {
+                if (error == 0) {
+                    Initializer(get());
+                }
+                else if (error != ERROR_ALREADY_EXISTS) {
+                    throw std::system_error(error, std::system_category());
+                }
+            }
+            catch (...) {
+                UnmapViewOfFile(m_memory);
+                throw;
+            }
         }
 
-        try {
-            if (error == 0) {
-                Initializer(get());
-            }
-            else if (error != ERROR_ALREADY_EXISTS) {
-                throw std::system_error(error, std::system_category());
-            }
-        }
-        catch (...) {
+        T& get() const noexcept { return *m_memory; }
+
+        ~SharedMemory() {
             UnmapViewOfFile(m_memory);
-            throw;
         }
-    }
-
-    T& get() const noexcept
-    {
-        return *m_memory;
-    }
-
-    ~SharedMemory()
-    {
-        UnmapViewOfFile(m_memory);
-    }
-
-private:
-    T* m_memory = nullptr;
-};
-} // namespace win32
+    private:
+        T* m_memory = nullptr;
+    };
+}
 
 class ExternalCommitHelper {
 public:
@@ -92,8 +86,7 @@ private:
     // The listener thread
     std::future<void> m_thread;
 
-    win32::SharedMemory<util::InterprocessCondVar::SharedPart, util::InterprocessCondVar::init_shared_part>
-        m_condvar_shared;
+    win32::SharedMemory<util::InterprocessCondVar::SharedPart, util::InterprocessCondVar::init_shared_part> m_condvar_shared;
 
     util::InterprocessCondVar m_commit_available;
     util::InterprocessMutex m_mutex;

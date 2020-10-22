@@ -37,17 +37,10 @@ private:
     class FdHolder {
     public:
         FdHolder() = default;
-        ~FdHolder()
-        {
-            close();
-        }
-        operator int() const
-        {
-            return m_fd;
-        }
+        ~FdHolder() { close(); }
+        operator int() const { return m_fd; }
 
-        FdHolder& operator=(int newFd)
-        {
+        FdHolder& operator=(int newFd) {
             close();
             m_fd = newFd;
             return *this;

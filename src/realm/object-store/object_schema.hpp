@@ -19,7 +19,7 @@
 #ifndef REALM_OBJECT_SCHEMA_HPP
 #define REALM_OBJECT_SCHEMA_HPP
 
-#include <realm/object-store/util/tagged_bool.hpp>
+#include "util/tagged_bool.hpp"
 
 #include <realm/keys.hpp>
 #include <realm/string_data.hpp>
@@ -31,7 +31,7 @@ namespace realm {
 class Group;
 class Schema;
 class Table;
-enum class PropertyType : unsigned short;
+enum class PropertyType: unsigned char;
 struct ObjectSchemaValidationException;
 struct Property;
 
@@ -64,21 +64,19 @@ public:
     TableKey table_key;
     IsEmbedded is_embedded = false;
 
-    Property* property_for_public_name(StringData public_name) noexcept;
-    const Property* property_for_public_name(StringData public_name) const noexcept;
-    Property* property_for_name(StringData name) noexcept;
-    const Property* property_for_name(StringData name) const noexcept;
-    Property* primary_key_property() noexcept
-    {
+    Property *property_for_public_name(StringData public_name) noexcept;
+    const Property *property_for_public_name(StringData public_name) const noexcept;
+    Property *property_for_name(StringData name) noexcept;
+    const Property *property_for_name(StringData name) const noexcept;
+    Property *primary_key_property() noexcept {
         return property_for_name(primary_key);
     }
-    const Property* primary_key_property() const noexcept
-    {
+    const Property *primary_key_property() const noexcept {
         return property_for_name(primary_key);
     }
     bool property_is_computed(Property const& property) const noexcept;
 
-    void validate(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions) const;
+    void validate(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions, bool for_sync) const;
 
     friend bool operator==(ObjectSchema const& a, ObjectSchema const& b) noexcept;
 
@@ -87,6 +85,6 @@ public:
 private:
     void set_primary_key_property() noexcept;
 };
-} // namespace realm
+}
 
 #endif /* defined(REALM_OBJECT_SCHEMA_HPP) */

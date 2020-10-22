@@ -16,24 +16,27 @@
  *
  **************************************************************************/
 
-#include <realm/object-store/util/bson/regular_expression.hpp>
+#include "util/bson/regular_expression.hpp"
 #include <numeric>
 
 namespace realm {
 namespace bson {
 
-RegularExpression::RegularExpression(const std::string pattern, const std::string& options)
-    : m_pattern(pattern)
-    , m_options(std::accumulate(options.begin(), options.end(), RegularExpression::Option::None,
-                                [](RegularExpression::Option a, char b) { return a | option_char_to_option(b); }))
+RegularExpression::RegularExpression(const std::string pattern,
+                                     const std::string& options) :
+m_pattern(pattern)
+, m_options(
+            std::accumulate(options.begin(),
+                            options.end(),
+                            RegularExpression::Option::None,
+                            [](RegularExpression::Option a, char b) { return a | option_char_to_option(b); }))
 {
 }
 
-RegularExpression::RegularExpression(const std::string pattern, Option options)
-    : m_pattern(pattern)
-    , m_options(options)
-{
-}
+RegularExpression::RegularExpression(const std::string pattern,
+                                     Option options) :
+m_pattern(pattern),
+m_options(options) {}
 
 const std::string RegularExpression::pattern() const
 {
@@ -59,20 +62,16 @@ constexpr RegularExpression::Option RegularExpression::option_char_to_option(con
         default:
             throw std::runtime_error("invalid regex option type");
     }
-}
+};
 
 std::ostream& operator<<(std::ostream& out, const RegularExpression::Option& option)
 {
     using Option = RegularExpression::Option;
 
-    if ((option & Option::IgnoreCase) != Option::None)
-        out << 'i';
-    if ((option & Option::Multiline) != Option::None)
-        out << 'm';
-    if ((option & Option::Dotall) != Option::None)
-        out << 's';
-    if ((option & Option::Extended) != Option::None)
-        out << 'x';
+    if ((option & Option::IgnoreCase) != Option::None) out << 'i';
+    if ((option & Option::Multiline) != Option::None) out << 'm';
+    if ((option & Option::Dotall) != Option::None) out << 's';
+    if ((option & Option::Extended) != Option::None) out << 'x';
 
     return out;
 }

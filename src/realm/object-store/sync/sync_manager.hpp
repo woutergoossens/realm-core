@@ -24,9 +24,9 @@
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
 
+#include <realm/sync/client.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
-#include <realm/sync/config.hpp>
 
 #include <memory>
 #include <mutex>
@@ -48,26 +48,32 @@ namespace _impl {
 struct SyncClient;
 }
 
+//enum class SyncSessionStopPolicy {
+//    Immediately,                    // Immediately stop the session as soon as all Realms/Sessions go out of scope.
+//    LiveIndefinitely,               // Never stop the session.
+//    AfterChangesUploaded,           // Once all Realms/Sessions go out of scope, wait for uploads to complete and stop.
+//};
+
 class SyncLoggerFactory {
 public:
     virtual std::unique_ptr<util::Logger> make_logger(util::Logger::Level) = 0;
 };
 
 struct SyncClientTimeouts {
-    SyncClientTimeouts();
     // See sync::Client::Config for the meaning of these fields.
-    uint64_t connect_timeout;
-    uint64_t connection_linger_time;
-    uint64_t ping_keepalive_period;
-    uint64_t pong_keepalive_timeout;
-    uint64_t fast_reconnect_limit;
+    uint64_t connect_timeout = sync::Client::default_connect_timeout;
+    uint64_t connection_linger_time = sync::Client::default_connection_linger_time;
+    uint64_t ping_keepalive_period = sync::Client::default_ping_keepalive_period;
+    uint64_t pong_keepalive_timeout = sync::Client::default_pong_keepalive_timeout;
+    uint64_t fast_reconnect_limit = sync::Client::default_fast_reconnect_limit;
 };
 
 struct SyncClientConfig {
+    using ReconnectMode = ReconnectMode;
     enum class MetadataMode {
-        NoEncryption, // Enable metadata, but disable encryption.
-        Encryption,   // Enable metadata, and use encryption (automatic if possible).
-        NoMetadata,   // Disable metadata.
+        NoEncryption,                   // Enable metadata, but disable encryption.
+        Encryption,                     // Enable metadata, and use encryption (automatic if possible).
+        NoMetadata,                     // Disable metadata.
     };
 
     std::string base_file_path;
@@ -90,8 +96,8 @@ struct SyncClientConfig {
 };
 
 class SyncManager : public std::enable_shared_from_this<SyncManager> {
-    friend class SyncSession;
-    friend struct ::TestSyncManager;
+friend class SyncSession;
+friend struct ::TestSyncManager;
 public:
     using MetadataMode = SyncClientConfig::MetadataMode;
 
@@ -108,8 +114,8 @@ public:
     void enable_session_multiplexing();
 
     // Sets the log level for the Sync Client.
-    // The log level can only be set up until the point the Sync Client is created. This happens when the first
-    // Session is created.
+    // The log level can only be set up until the point the Sync Client is created. This happens when the first Session
+    // is created.
     void set_log_level(util::Logger::Level) noexcept;
     void set_logger_factory(SyncLoggerFactory&) noexcept;
 
@@ -117,9 +123,9 @@ public:
     std::unique_ptr<util::Logger> make_logger() const;
 
     // Sets the application level user agent string.
-    // This should have the format specified here:
-    // https://github.com/realm/realm-sync/blob/develop/src/realm/sync/client.hpp#L126 The user agent can only be set
-    // up  until the  point the Sync Client is created. This happens when the first Session is created.
+    // This should have the format specified here: https://github.com/realm/realm-sync/blob/develop/src/realm/sync/client.hpp#L126
+    // The user agent can only be set up  until the  point the Sync Client is created. This happens when the first
+    // Session is created.
     void set_user_agent(std::string user_agent);
 
     // Sets client timeout settings.
@@ -137,8 +143,7 @@ public:
 
     util::Logger::Level log_level() const noexcept;
 
-    std::shared_ptr<SyncSession> get_session(const std::string& path, const SyncConfig& config,
-                                             bool force_client_resync = false);
+    std::shared_ptr<SyncSession> get_session(const std::string& path, const SyncConfig& config, bool force_client_resync=false);
     std::shared_ptr<SyncSession> get_existing_session(const std::string& path) const;
     std::shared_ptr<SyncSession> get_existing_active_session(const std::string& path) const;
 
@@ -152,8 +157,11 @@ public:
 
     // Get a sync user for a given identity, or create one if none exists yet, and set its token.
     // If a logged-out user exists, it will marked as logged back in.
-    std::shared_ptr<SyncUser> get_user(const std::string& id, std::string refresh_token, std::string access_token,
-                                       const std::string provider_type, std::string device_id);
+    std::shared_ptr<SyncUser> get_user(const std::string& id,
+                                       std::string refresh_token,
+                                       std::string access_token,
+                                       const std::string provider_type,
+                                       std::string device_id);
 
     // Get an existing user for a given identifier, if one exists and is logged in.
     std::shared_ptr<SyncUser> get_existing_logged_in_user(const std::string& user_id) const;
@@ -185,7 +193,7 @@ public:
     std::string path_for_realm(const SyncConfig& config, util::Optional<std::string> custom_file_name = none) const;
 
     // Get the path of the recovery directory for backed-up or recovered Realms.
-    std::string recovery_directory_path(util::Optional<std::string> const& custom_dir_name = none) const;
+    std::string recovery_directory_path(util::Optional<std::string> const& custom_dir_name=none) const;
 
     // Get the unique identifier of this client.
     std::string client_uuid() const;
@@ -198,13 +206,11 @@ public:
     // Get the app metadata for the active app.
     util::Optional<SyncAppMetadata> app_metadata() const;
 
-    void set_sync_route(std::string sync_route)
-    {
+    void set_sync_route(std::string sync_route) {
         m_sync_route = std::move(sync_route);
     }
 
-    const std::string sync_route() const
-    {
+    const std::string sync_route() const {
         return m_sync_route;
     }
 
@@ -216,11 +222,12 @@ public:
     SyncManager() = default;
     SyncManager(const SyncManager&) = delete;
     SyncManager& operator=(const SyncManager&) = delete;
-
 private:
     friend class app::App;
 
-    void configure(std::shared_ptr<app::App> app, const std::string& sync_route, const SyncClientConfig& config);
+    void configure(std::shared_ptr<app::App> app,
+                   const std::string& sync_route,
+                   const SyncClientConfig& config);
 
     // Stop tracking the session for the given path if it is inactive.
     // No-op if the session is either still active or in the active sessions list

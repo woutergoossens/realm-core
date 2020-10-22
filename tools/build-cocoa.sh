@@ -290,9 +290,9 @@ if [[ -n $COPY ]]; then
 
     if [[ ! -z $BUILD_XCFRAMEWORK ]]; then
         rm -rf "${DESTINATION}/realm-monorepo.xcframework"
-        cp -Rc realm-monorepo.xcframework "${DESTINATION}"
+        cp -Rc core/realm-monorepo.xcframework "${DESTINATION}"
         rm -rf "${DESTINATION}/realm-monorepo-dbg.xcframework"
-        cp -Rc realm-monorepo-dbg.xcframework "${DESTINATION}"
+        cp -Rc core/realm-monorepo-dbg.xcframework "${DESTINATION}"
     fi
 else
     rm -f "realm-monorepo-cocoa-${VERSION}.tar.xz"

@@ -86,9 +86,9 @@ if(REALM_ENABLE_SYNC)
         sync/sync_user.hpp
         sync/app_service_client.hpp
         sync/auth_request_client.hpp
-        sync/remote_mongo_client.hpp
-        sync/remote_mongo_collection.hpp
-        sync/remote_mongo_database.hpp
+        sync/mongo_client.hpp
+        sync/mongo_collection.hpp
+        sync/mongo_database.hpp
         sync/push_client.hpp)
     set(SYNC_IMPL_HEADERS
         sync/impl/sync_client.hpp
@@ -110,9 +110,9 @@ if(REALM_ENABLE_SYNC)
         sync/sync_manager.cpp
         sync/sync_session.cpp
         sync/sync_user.cpp
-        sync/remote_mongo_client.cpp
-        sync/remote_mongo_collection.cpp
-        sync/remote_mongo_database.cpp
+        sync/mongo_client.cpp
+        sync/mongo_collection.cpp
+        sync/mongo_database.cpp
         sync/push_client.cpp
         sync/impl/sync_file.cpp
         sync/impl/sync_metadata.cpp
@@ -125,7 +125,17 @@ if(REALM_ENABLE_SYNC)
     endif()
 endif()
 
-add_library(ObjectStore STATIC ${SOURCES} ${HEADERS})
+if(REALM_ENABLE_SYNC)
+    add_library(ObjectStore STATIC ${SOURCES} 
+                                   ${HEADERS} 
+                                   ${IMPL_HEADERS} 
+                                   ${UTIL_HEADERS} 
+                                   ${SYNC_HEADERS} 
+                                   ${SYNC_IMPL_HEADERS} 
+                                   ${BSON_HEADERS})
+else()
+    add_library(ObjectStore STATIC ${SOURCES} ${HEADERS})
+endif()
 add_library(Realm::ObjectStore ALIAS ObjectStore)
 
 set_target_properties(ObjectStore PROPERTIES
