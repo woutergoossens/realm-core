@@ -171,10 +171,14 @@ std::string print_value<>(realm::UUID uuid)
     return "uuid(" + uuid.to_string() + ")";
 }
 
-template <>
-std::string print_value<>(realm::TypeOfValue type)
+StringData get_printable_table_name(StringData name)
 {
-    return '"' + type.to_string() + '"';
+    // the "class_" prefix is an implementation detail of the object store that shouldn't be exposed to users
+    static const std::string prefix = "class_";
+    if (name.size() > prefix.size() && strncmp(name.data(), prefix.data(), prefix.size()) == 0) {
+        name = StringData(name.data() + prefix.size(), name.size() - prefix.size());
+    }
+    return name;
 }
 
 // The variable name must be unique with respect to the already chosen variables at
