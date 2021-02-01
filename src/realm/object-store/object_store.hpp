@@ -95,6 +95,9 @@ public:
     static realm::TableRef table_for_object_type(Group& group, StringData object_type);
     static realm::ConstTableRef table_for_object_type(Group const& group, StringData object_type);
 
+    // get table key from object type
+    static TableKey ObjectStore::table_key_for_object_type(Group& group, StringData object_type);
+
     // get existing Schema from a group
     static Schema schema_from_group(Group const& group);
 

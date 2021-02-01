@@ -278,6 +278,12 @@ ConstTableRef ObjectStore::table_for_object_type(Group const& group, StringData 
     return group.get_table(name);
 }
 
+TableKey ObjectStore::table_key_for_object_type(Group& group, StringData object_type)
+{
+    auto name = table_name_for_object_type(object_type);
+    return group.find_table(name);
+}
+
 namespace {
 struct SchemaDifferenceExplainer {
     std::vector<ObjectSchemaValidationException> errors;
