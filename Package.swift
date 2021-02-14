@@ -202,7 +202,7 @@ let package = Package(
             ] + cxxSettings) as [CXXSetting]),
         .target(
             name: "RealmFFI",
-            dependencies: ["Capi"],
+            dependencies: ["Capi", "QueryParser"],
             path: "src/swift"),
         .target(
             name: "ObjectStoreTestUtils",
