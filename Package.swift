@@ -25,11 +25,16 @@ let cxxSettings: [CXXSetting] = [
 
 let syncServerSources = [
     "realm/sync/encrypt",
-    "realm/sync/noinst",
+    "realm/sync/noinst/reopening_file_logger.cpp",
+    "realm/sync/noinst/server_dir.cpp",
+    "realm/sync/noinst/server_file_access_cache.cpp",
+    "realm/sync/noinst/server_history.cpp",
+    "realm/sync/noinst/server_legacy_migration.cpp",
     "realm/sync/noinst/vacuum.cpp",
     "realm/sync/access_control.cpp",
     "realm/sync/crypto_server_apple.mm",
     "realm/sync/metrics.cpp",
+    "realm/sync/noinst/root_certs.hpp",
     "realm/sync/server_configuration.cpp",
     "realm/sync/server.cpp"
 ]
@@ -135,29 +140,9 @@ let package = Package(
             name: "SyncClient",
             dependencies: ["Storage"],
             path: "src",
-            exclude: [
+            exclude: ([
                 "realm/sync/crypto_server_openssl.cpp",
-                "realm/sync/apply_to_state_command.cpp",
-                "realm/sync/encrypt/encryption_transformer_command.cpp",
-                "realm/sync/inspector",
-                "realm/sync/encrypt",
-                "realm/sync/noinst",
-                "realm/sync/access_control.cpp",
-                "realm/sync/crypto_server_apple.mm",
-                "realm/sync/metrics.cpp",
-                "realm/sync/server_configuration.cpp",
-                "realm/sync/server.cpp",
-                "realm/sync/noinst/vacuum_command.cpp",
-                "realm/sync/dump_command.cpp",
-                "realm/sync/hist_command.cpp",
-                "realm/sync/print_changeset_command.cpp",
-                "realm/sync/realm_upgrade.cpp",
-                "realm/sync/server_command.cpp",
-                "realm/sync/server_index.cpp",
-                "realm/sync/server_index_command.cpp",
-                "realm/sync/stat_command.cpp",
-                "realm/sync/verify_server_file_command.cpp"
-            ],
+            ] + syncCommandSources + syncServerSources) as [String],
             sources: [
                 "realm/sync",
                 "realm/util/network.cpp",
@@ -223,7 +208,7 @@ let package = Package(
             path: "src/swift"),
         .target(
             name: "ObjectStoreTestUtils",
-            dependencies: ["ObjectStore"],
+            dependencies: ["ObjectStore", "SyncServer"],
             path: "test/object-store/util",
             publicHeadersPath: ".",
             cxxSettings: ([
