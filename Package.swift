@@ -34,6 +34,7 @@ let syncServerSources = [
     "realm/sync/access_control.cpp",
     "realm/sync/crypto_server_apple.mm",
     "realm/sync/metrics.cpp",
+    "realm/sync/noinst/root_certs.hpp",
     "realm/sync/server_configuration.cpp",
     "realm/sync/server.cpp"
 ]
