@@ -28,7 +28,6 @@
 #include <stdexcept>
 
 namespace {
-//constexpr int DECIMAL_EXPONENT_BIAS_128 = DECIMAL_EXPONENT_BIAS_128;
 constexpr int MAX_STRING_DIGITS = 19;
 } // namespace
 

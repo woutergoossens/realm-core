@@ -187,7 +187,11 @@ let package = Package(
                 .define("REALM_ENABLE_SYNC", to: "1"),
                 .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
                 .headerSearchPath("realm/object-store")
-            ] + cxxSettings) as [CXXSetting]),
+            ] + cxxSettings) as [CXXSetting],
+            linkerSettings: [
+                .linkedFramework("Security", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
+                .linkedLibrary("z")
+            ]),
         .target(
             name: "Capi",
             dependencies: ["ObjectStore", "QueryParser"],
