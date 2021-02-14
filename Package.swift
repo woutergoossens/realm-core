@@ -1,4 +1,4 @@
-// swift-tools-version:5.0
+// swift-tools-version:5.3
 
 import PackageDescription
 import Foundation
@@ -23,7 +23,7 @@ let cxxSettings: [CXXSetting] = [
     .define("REALM_VERSION_STRING", to: "\"\(versionStr)\""),
 ]
 
-let syncServerSources = [
+var syncServerSources = [
     "realm/sync/encrypt",
     "realm/sync/noinst/reopening_file_logger.cpp",
     "realm/sync/noinst/server_dir.cpp",
@@ -32,12 +32,17 @@ let syncServerSources = [
     "realm/sync/noinst/server_legacy_migration.cpp",
     "realm/sync/noinst/vacuum.cpp",
     "realm/sync/access_control.cpp",
-    "realm/sync/crypto_server_apple.mm",
     "realm/sync/metrics.cpp",
     "realm/sync/noinst/root_certs.hpp",
     "realm/sync/server_configuration.cpp",
     "realm/sync/server.cpp"
 ]
+
+#if os(Linux)
+syncServerSources.append("realm/sync/crypto_server_openssl.cpp")
+#else
+syncServerSources.append("realm/sync/crypto_server_apple.mm")
+#endif
 
 let syncCommandSources = [
     "realm/sync/apply_to_state_command.cpp",
@@ -246,11 +251,11 @@ let package = Package(
             ] + cxxSettings) as [CXXSetting]),
         .target(
             name: "SyncServer",
-            dependencies: ["SyncClient"],
+            dependencies: [
+                "SyncClient"
+            ],
             path: "src",
-            exclude: ([
-                "realm/sync/crypto_server_openssl.cpp",
-            ] + syncCommandSources) as [String],
+            exclude: syncCommandSources,
             sources: syncServerSources,
             publicHeadersPath: "realm/sync/impl", // hack
             cxxSettings: cxxSettings,
@@ -284,5 +289,5 @@ let package = Package(
                 .headerSearchPath("../../../external/catch/single_include")
             ] + cxxSettings) as [CXXSetting])
     ],
-    cxxLanguageStandard: .cxx1z
+    cxxLanguageStandard: .gnucxx1z
 )
