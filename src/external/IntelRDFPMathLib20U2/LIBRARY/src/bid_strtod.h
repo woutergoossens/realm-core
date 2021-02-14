@@ -132,7 +132,7 @@ int i,k;
    }
    while(iswspace(*ps_in)) ps_in++;
    k = 1+wcslen(ps_in);
-   ps = (char*)malloc((k+1)*sizeof(wchar_t));
+   ps = (wchar_t *)malloc((k+1)*sizeof(wchar_t));
    if(!ps)
    {
 		   set_wcs_end(endptr,ps_in);
