@@ -1,7 +1,7 @@
 #ifndef REALM_SYNC_VERSION_HPP
 #define REALM_SYNC_VERSION_HPP
 
-#include <realm/util/features.h>
+//#include <realm/util/features.h>
 
 // clang-format off
 #define REALM_SYNC_VER_MAJOR 10

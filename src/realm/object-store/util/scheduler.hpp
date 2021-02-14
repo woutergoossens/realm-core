@@ -25,7 +25,7 @@
 #include <functional>
 #include <memory>
 
-#if REALM_PLATFORM_APPLE
+#if REALM_PLATFORM_APPLE || REALM_USE_CF
 #include <CoreFoundation/CoreFoundation.h>
 #endif
 

@@ -159,26 +159,18 @@ let package = Package(
                 .linkedLibrary("z")
             ]),
         .target(
-            name: "SyncServer",
-            dependencies: ["SyncClient"],
-            path: "src",
-            exclude: ([
-                "realm/sync/crypto_server_openssl.cpp",
-            ] + syncCommandSources) as [String],
-            sources: syncServerSources,
-            publicHeadersPath: "realm/sync/impl", // hack
-            cxxSettings: cxxSettings,
-            linkerSettings: [
-                .linkedFramework("Foundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-            ]),
-        .target(
             name: "ObjectStore",
             dependencies: ["SyncClient"],
             path: "src",
             exclude: [
-//                "realm/object-store/impl/epoll",
                 "realm/object-store/impl/generic",
                 "realm/object-store/impl/windows",
+                "realm/object-store/impl/apple/external_commit_helper.hpp",
+                "realm/object-store/impl/generic/external_commit_helper.hpp",
+                "realm/object-store/impl/windows/external_commit_helper.hpp",
+                "realm/object-store/util/windows/",
+                "realm/object-store/util/android/",
+                "realm/object-store/util/apple/",
                 "realm/object-store/c_api"
             ],
             sources: ["realm/object-store"],
@@ -195,7 +187,7 @@ let package = Package(
             ]),
         .target(
             name: "Capi",
-            dependencies: ["ObjectStore", "QueryParser"],
+            dependencies: ["ObjectStore"],
             path: "src",
             exclude: [
                 "realm/object-store/c_api/realm.c"
@@ -213,7 +205,7 @@ let package = Package(
             path: "src/swift"),
         .target(
             name: "ObjectStoreTestUtils",
-            dependencies: ["ObjectStore", "SyncServer"],
+            dependencies: ["ObjectStore"],
             path: "test/object-store/util",
             publicHeadersPath: ".",
             cxxSettings: ([
@@ -224,7 +216,7 @@ let package = Package(
             ] + cxxSettings) as [CXXSetting]),
         .target(
             name: "ObjectStoreTests",
-            dependencies: ["ObjectStore", "SyncServer", "QueryParser", "ObjectStoreTestUtils"],
+            dependencies: ["ObjectStore", "ObjectStoreTestUtils"],
             path: "test/object-store",
             exclude: [
                 "benchmarks",
