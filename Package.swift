@@ -159,19 +159,48 @@ let package = Package(
                 .linkedLibrary("z")
             ]),
         .target(
+            name: "ExternalCommitHelper",
+            dependencies: ["Storage"],
+            path: "src",
+            sources: [
+                "realm/object-store/impl/apple"
+            ],
+            publicHeadersPath: "realm/object-store/impl/apple",
+            cxxSettings: [
+                .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS]))
+            ] + cxxSettings
+        ),
+        .target(
+            name: "ExternalCommitHelperLinux",
+            dependencies: ["Storage"],
+            path: "src",
+            sources: [
+                "realm/object-store/impl/epoll"
+            ],
+            publicHeadersPath: "realm/object-store/impl/epoll",
+            cxxSettings: [
+                .define("REALM_HAVE_EPOLL", to: "1", .when(platforms: [.linux])),
+            ] + cxxSettings
+        ),
+        .target(
             name: "ObjectStore",
-            dependencies: ["SyncClient"],
+            dependencies: [
+                "SyncClient",
+                ._targetItem(name: "ExternalCommitHelper",
+                             condition: .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
+                ._targetItem(name: "ExternalCommitHelperLinux",
+                             condition: .when(platforms: [.linux])),
+            ],
             path: "src",
             exclude: [
+                "realm/object-store/impl/apple",
                 "realm/object-store/impl/generic",
                 "realm/object-store/impl/windows",
-                "realm/object-store/impl/apple/external_commit_helper.hpp",
-                "realm/object-store/impl/generic/external_commit_helper.hpp",
-                "realm/object-store/impl/windows/external_commit_helper.hpp",
-                "realm/object-store/util/windows/",
-                "realm/object-store/util/android/",
-                "realm/object-store/util/apple/",
-                "realm/object-store/util/apple/scheduler.hpp",
+                "realm/object-store/impl/epoll",
+                "realm/object-store/util/android",
+                "realm/object-store/util/apple",
+                "realm/object-store/util/generic",
+                "realm/object-store/util/uv",
                 "realm/object-store/c_api"
             ],
             sources: ["realm/object-store"],
@@ -188,7 +217,7 @@ let package = Package(
             ]),
         .target(
             name: "Capi",
-            dependencies: ["ObjectStore"],
+            dependencies: ["ObjectStore", "QueryParser"],
             path: "src",
             exclude: [
                 "realm/object-store/c_api/realm.c"
@@ -202,7 +231,7 @@ let package = Package(
             ] + cxxSettings) as [CXXSetting]),
         .target(
             name: "RealmFFI",
-            dependencies: ["Capi", "QueryParser"],
+            dependencies: ["Capi"],
             path: "src/swift"),
         .target(
             name: "ObjectStoreTestUtils",
@@ -216,8 +245,21 @@ let package = Package(
                 .headerSearchPath("../../../external/catch/single_include"),
             ] + cxxSettings) as [CXXSetting]),
         .target(
+            name: "SyncServer",
+            dependencies: ["SyncClient"],
+            path: "src",
+            exclude: ([
+                "realm/sync/crypto_server_openssl.cpp",
+            ] + syncCommandSources) as [String],
+            sources: syncServerSources,
+            publicHeadersPath: "realm/sync/impl", // hack
+            cxxSettings: cxxSettings,
+            linkerSettings: [
+                .linkedFramework("Foundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
+            ]),
+        .target(
             name: "ObjectStoreTests",
-            dependencies: ["ObjectStore", "ObjectStoreTestUtils"],
+            dependencies: ["ObjectStore", "ObjectStoreTestUtils", "QueryParser", "SyncServer"],
             path: "test/object-store",
             exclude: [
                 "benchmarks",
@@ -233,7 +275,7 @@ let package = Package(
             ] + cxxSettings) as [CXXSetting]),
         .target(
             name: "CapiTests",
-            dependencies: ["Capi", "ObjectStoreTestUtils"],
+            dependencies: ["Capi", "ObjectStoreTestUtils", "SyncServer"],
             path: "test/object-store/c_api",
             cxxSettings: ([
                 .define("REALM_ENABLE_SYNC", to: "1"),

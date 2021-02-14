@@ -15,7 +15,7 @@
 // limitations under the License.
 //
 ////////////////////////////////////////////////////////////////////////////
-#if REALM_PLATFORM_APPLE
+
 #include <realm/object-store/impl/apple/keychain_helper.hpp>
 
 
@@ -144,4 +144,4 @@ std::vector<char> metadata_realm_encryption_key(bool check_legacy_service)
 
 } // namespace keychain
 } // namespace realm
-#endif // REALM_PLATFORM_APPLE
+

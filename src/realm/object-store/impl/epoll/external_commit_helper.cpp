@@ -15,7 +15,7 @@
 // limitations under the License.
 //
 ////////////////////////////////////////////////////////////////////////////
-#if REALM_HAVE_EPOLL
+
 #include <realm/object-store/impl/external_commit_helper.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/util/fifo_helper.hpp>
@@ -303,4 +303,4 @@ void ExternalCommitHelper::notify_others()
 {
     notify_fd(m_notify_fd);
 }
-#endif
+

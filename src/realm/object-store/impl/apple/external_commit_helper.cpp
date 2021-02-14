@@ -15,7 +15,7 @@
 // limitations under the License.
 //
 ////////////////////////////////////////////////////////////////////////////
-#if REALM_PLATFORM_APPLE
+
 #include <realm/object-store/impl/external_commit_helper.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
 
@@ -243,4 +243,4 @@ void ExternalCommitHelper::notify_others()
         notify_fd(m_notify_fd, m_notify_fd);
     }
 }
-#endif
+

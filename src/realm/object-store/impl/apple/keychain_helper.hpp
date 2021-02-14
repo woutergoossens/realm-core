@@ -18,7 +18,7 @@
 
 #ifndef REALM_OS_KEYCHAIN_HELPER_HPP
 #define REALM_OS_KEYCHAIN_HELPER_HPP
-#if REALM_PLATFORM_APPLE
+
 #include <cstdint>
 #include <stdexcept>
 #include <vector>
@@ -35,5 +35,5 @@ public:
 
 } // namespace keychain
 } // namespace realm
-#endif // REALM_PLATFORM_APPLE
+
 #endif // REALM_OS_KEYCHAIN_HELPER_HPP
