@@ -171,6 +171,7 @@ let package = Package(
                 "realm/object-store/util/windows/",
                 "realm/object-store/util/android/",
                 "realm/object-store/util/apple/",
+                "realm/object-store/util/apple/scheduler.hpp",
                 "realm/object-store/c_api"
             ],
             sources: ["realm/object-store"],
