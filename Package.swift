@@ -244,5 +244,5 @@ let package = Package(
                 .headerSearchPath("../../../external/catch/single_include")
             ] + cxxSettings) as [CXXSetting])
     ],
-    cxxLanguageStandard: .gnucxx1z
+    cxxLanguageStandard: .cxx1z
 )
