@@ -25,16 +25,11 @@ let cxxSettings: [CXXSetting] = [
 
 let syncServerSources = [
     "realm/sync/encrypt",
-    "realm/sync/noinst/reopening_file_logger.cpp",
-    "realm/sync/noinst/server_dir.cpp",
-    "realm/sync/noinst/server_file_access_cache.cpp",
-    "realm/sync/noinst/server_history.cpp",
-    "realm/sync/noinst/server_legacy_migration.cpp",
+    "realm/sync/noinst",
     "realm/sync/noinst/vacuum.cpp",
     "realm/sync/access_control.cpp",
     "realm/sync/crypto_server_apple.mm",
     "realm/sync/metrics.cpp",
-    "realm/sync/noinst/root_certs.hpp",
     "realm/sync/server_configuration.cpp",
     "realm/sync/server.cpp"
 ]
