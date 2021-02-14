@@ -176,7 +176,7 @@ let package = Package(
             dependencies: ["SyncClient"],
             path: "src",
             exclude: [
-                "realm/object-store/impl/epoll",
+//                "realm/object-store/impl/epoll",
                 "realm/object-store/impl/generic",
                 "realm/object-store/impl/windows",
                 "realm/object-store/c_api"
@@ -186,6 +186,7 @@ let package = Package(
             cxxSettings: ([
                 .define("REALM_ENABLE_SYNC", to: "1"),
                 .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
+                .define("REALM_HAVE_EPOLL", to: "1", .when(platforms: [.linux])),
                 .headerSearchPath("realm/object-store")
             ] + cxxSettings) as [CXXSetting],
             linkerSettings: [
