@@ -1,4 +1,4 @@
-// swift-tools-version:5.3
+// swift-tools-version:5.2
 
 import PackageDescription
 import Foundation
@@ -21,6 +21,8 @@ let cxxSettings: [CXXSetting] = [
     .define("REALM_VERSION_PATCH", to: String(versionCompontents[2])),
     .define("REALM_VERSION_EXTRA", to: "\"\(versionExtra)\""),
     .define("REALM_VERSION_STRING", to: "\"\(versionStr)\""),
+    .define("REALM_NOINST_ROOT_CERTS", to: "0"),
+//    .unsafeFlags(["-std=c++17", "-g", "-Wall"])
 ]
 
 var syncServerSources = [
@@ -59,6 +61,14 @@ let syncCommandSources = [
     "realm/sync/stat_command.cpp",
     "realm/sync/verify_server_file_command.cpp"
 ]
+
+var syncClientExcludes = syncServerSources + syncCommandSources
+#if !os(Linux)
+syncClientExcludes.append("realm/sync/crypto_server_openssl.cpp")
+#else
+syncClientExcludes.append("realm/sync/crypto_server_apple.mm")
+syncClientExcludes.append("realm/sync/noinst")
+#endif
 
 let package = Package(
     name: "RealmDatabase",
@@ -145,9 +155,7 @@ let package = Package(
             name: "SyncClient",
             dependencies: ["Storage"],
             path: "src",
-            exclude: ([
-                "realm/sync/crypto_server_openssl.cpp",
-            ] + syncCommandSources + syncServerSources) as [String],
+            exclude: syncClientExcludes,
             sources: [
                 "realm/sync",
                 "realm/util/network.cpp",
@@ -206,7 +214,8 @@ let package = Package(
                 "realm/object-store/util/apple",
                 "realm/object-store/util/generic",
                 "realm/object-store/util/uv",
-                "realm/object-store/c_api"
+                "realm/object-store/c_api",
+                "realm/sync"
             ],
             sources: ["realm/object-store"],
             publicHeadersPath: "realm/object-store",
@@ -289,5 +298,5 @@ let package = Package(
                 .headerSearchPath("../../../external/catch/single_include")
             ] + cxxSettings) as [CXXSetting])
     ],
-    cxxLanguageStandard: .gnucxx1z
+    cxxLanguageStandard: .cxx1z
 )
