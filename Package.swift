@@ -22,22 +22,17 @@ let cxxSettings: [CXXSetting] = [
     .define("REALM_VERSION_EXTRA", to: "\"\(versionExtra)\""),
     .define("REALM_VERSION_STRING", to: "\"\(versionStr)\""),
     .define("REALM_NOINST_ROOT_CERTS", to: "0"),
-//    .unsafeFlags(["-std=c++17", "-g", "-Wall"])
+    .define("REALM_HAVE_UV", to: "1", .when(platforms: [.linux])),
 ]
 
 var syncServerSources = [
     "realm/sync/encrypt",
-    "realm/sync/noinst/reopening_file_logger.cpp",
-    "realm/sync/noinst/server_dir.cpp",
-    "realm/sync/noinst/server_file_access_cache.cpp",
-    "realm/sync/noinst/server_history.cpp",
-    "realm/sync/noinst/server_legacy_migration.cpp",
-    "realm/sync/noinst/vacuum.cpp",
+    "realm/sync/noinst",
     "realm/sync/access_control.cpp",
     "realm/sync/metrics.cpp",
-    "realm/sync/noinst/root_certs.hpp",
     "realm/sync/server_configuration.cpp",
-    "realm/sync/server.cpp"
+    "realm/sync/server.cpp",
+    "realm/sync/noinst/client_impl_base.cpp",
 ]
 
 #if os(Linux)
@@ -68,6 +63,20 @@ syncClientExcludes.append("realm/sync/crypto_server_openssl.cpp")
 #else
 syncClientExcludes.append("realm/sync/crypto_server_apple.mm")
 syncClientExcludes.append("realm/sync/noinst")
+#endif
+
+
+var objectStoreExcludes = [
+  "realm/object-store/util/generic",
+  "realm/object-store/impl/windows",
+  "realm/object-store/c_api",
+  "realm/object-store/impl/generic",
+]
+#if os(Linux)
+objectStoreExcludes.append("realm/object-store/impl/apple/keychain_helper.cpp")
+objectStoreExcludes.append("realm/object-store/impl/apple/external_commit_helper.cpp")
+#else
+
 #endif
 
 let package = Package(
@@ -147,7 +156,7 @@ let package = Package(
             dependencies: ["Storage"],
             path: "src",
             sources: ["realm/parser"],
-            publicHeadersPath: "realm/parser",
+            publicHeadersPath: ".",
             cxxSettings: [
                 .headerSearchPath("realm/parser/generated")
             ] + cxxSettings),
@@ -163,7 +172,7 @@ let package = Package(
                 "realm/util/http.cpp",
                 "realm/util/websocket.cpp"
             ],
-            publicHeadersPath: "realm/sync",
+            publicHeadersPath: ".",
             cxxSettings: [
                 .define("REALM_HAVE_SECURE_TRANSPORT", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
             ] + cxxSettings,
@@ -171,6 +180,7 @@ let package = Package(
                 .linkedFramework("Security", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
                 .linkedLibrary("z")
             ]),
+        /**
         .target(
             name: "ExternalCommitHelper",
             dependencies: ["Storage"],
@@ -194,36 +204,27 @@ let package = Package(
             cxxSettings: [
                 .define("REALM_HAVE_EPOLL", to: "1", .when(platforms: [.linux])),
             ] + cxxSettings
-        ),
+        ),*/
         .target(
             name: "ObjectStore",
             dependencies: [
-                "SyncClient",
-                ._targetItem(name: "ExternalCommitHelper",
-                             condition: .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-                ._targetItem(name: "ExternalCommitHelperLinux",
-                             condition: .when(platforms: [.linux])),
+//                "SyncClient",
+//                ._targetItem(name: "ExternalCommitHelper",
+//                             condition: .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
+ //               ._targetItem(name: "ExternalCommitHelperLinux",
+  //                           condition: .when(platforms: [.linux])),
             ],
             path: "src",
-            exclude: [
-                "realm/object-store/impl/apple",
-                "realm/object-store/impl/generic",
-                "realm/object-store/impl/windows",
-                "realm/object-store/impl/epoll",
-                "realm/object-store/util/android",
-                "realm/object-store/util/apple",
-                "realm/object-store/util/generic",
-                "realm/object-store/util/uv",
-                "realm/object-store/c_api",
-                "realm/sync"
-            ],
+            exclude: objectStoreExcludes,
             sources: ["realm/object-store"],
-            publicHeadersPath: "realm/object-store",
+            publicHeadersPath: ".",
             cxxSettings: ([
                 .define("REALM_ENABLE_SYNC", to: "1"),
                 .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
                 .define("REALM_HAVE_EPOLL", to: "1", .when(platforms: [.linux])),
-                .headerSearchPath("realm/object-store")
+                .define("REALM_HAVE_UV", to: "1", .when(platforms: [.linux])),
+//                .headerSearchPath("realm/object-store/**/*"),
+//                .headerSearchPath("realm/object-store/impl")
             ] + cxxSettings) as [CXXSetting],
             linkerSettings: [
                 .linkedFramework("Security", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
@@ -242,12 +243,18 @@ let package = Package(
                 .define("REALM_ENABLE_SYNC", to: "1"),
                 .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
                 .headerSearchPath("external/pegtl/include/tao")
-            ] + cxxSettings) as [CXXSetting]),
+                          ] + cxxSettings) as [CXXSetting],
+            linkerSettings: [
+              .linkedLibrary("pthread"),
+              .linkedLibrary("uv"),
+              .linkedLibrary("m"),
+              .linkedLibrary("crypto")
+            ]),
         .target(
             name: "RealmFFI",
             dependencies: ["Capi"],
             path: "src/swift"),
-        .target(
+        /*.target(
             name: "ObjectStoreTestUtils",
             dependencies: ["ObjectStore"],
             path: "test/object-store/util",
@@ -258,7 +265,7 @@ let package = Package(
                 .headerSearchPath(".."),
                 .headerSearchPath("../../../external/catch/single_include"),
             ] + cxxSettings) as [CXXSetting]),
-        .target(
+        */.target(
             name: "SyncServer",
             dependencies: [
                 "SyncClient"
@@ -273,30 +280,46 @@ let package = Package(
             ]),
         .target(
             name: "ObjectStoreTests",
-            dependencies: ["ObjectStore", "ObjectStoreTestUtils", "QueryParser", "SyncServer"],
+            dependencies: [
+              //"SyncClient",
+              "ObjectStore",
+              "QueryParser",
+              "SyncServer",
+              //"ObjectStoreTestUtils"
+            ],
             path: "test/object-store",
             exclude: [
                 "benchmarks",
                 "notifications-fuzzer",
                 "c_api",
-                "util",
+                //"util"
             ],
             cxxSettings: ([
                 .define("REALM_ENABLE_SYNC", to: "1"),
                 .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
+                .define("REALM_HAVE_UV", to: "1", .when(platforms: [.linux])),
                 .headerSearchPath("."),
                 .headerSearchPath("../../external/catch/single_include"),
-            ] + cxxSettings) as [CXXSetting]),
-        .target(
+                          ] + cxxSettings) as [CXXSetting],
+            linkerSettings: [
+              .linkedLibrary("pthread"),
+              .linkedLibrary("uv"),
+              .linkedLibrary("m"),
+              .linkedLibrary("crypto")
+            ]
+        ),
+/*        .target(
             name: "CapiTests",
-            dependencies: ["Capi", "ObjectStoreTestUtils", "SyncServer"],
+            dependencies: ["Capi",
+                           "ObjectStoreTestUtils",
+                           "SyncServer"],
             path: "test/object-store/c_api",
             cxxSettings: ([
                 .define("REALM_ENABLE_SYNC", to: "1"),
                 .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
                 .headerSearchPath("../"),
                 .headerSearchPath("../../../external/catch/single_include")
-            ] + cxxSettings) as [CXXSetting])
+            ] + cxxSettings) as [CXXSetting])*/
     ],
     cxxLanguageStandard: .cxx1z
 )

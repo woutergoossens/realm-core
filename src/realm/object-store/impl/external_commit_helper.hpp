@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-//#ifndef REALM_EXTERNAL_COMMIT_HELPER_HPP
-//#define REALM_EXTERNAL_COMMIT_HELPER_HPP
+#ifndef REALM_EXTERNAL_COMMIT_HELPER_HPP
+#define REALM_EXTERNAL_COMMIT_HELPER_HPP
 
 #include <realm/util/features.h>
 
@@ -32,4 +32,4 @@
 #include <realm/object-store/impl/generic/external_commit_helper.hpp>
 #endif
 
-//#endif // REALM_EXTERNAL_COMMIT_HELPER_HPP
+#endif // REALM_EXTERNAL_COMMIT_HELPER_HPP
