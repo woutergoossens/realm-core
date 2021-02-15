@@ -208,7 +208,7 @@ let package = Package(
         .target(
             name: "ObjectStore",
             dependencies: [
-//                "SyncClient",
+                "SyncClient",
 //                ._targetItem(name: "ExternalCommitHelper",
 //                             condition: .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
  //               ._targetItem(name: "ExternalCommitHelperLinux",
