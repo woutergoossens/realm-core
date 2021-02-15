@@ -76,7 +76,7 @@ var objectStoreExcludes = [
 objectStoreExcludes.append("realm/object-store/impl/apple/keychain_helper.cpp")
 objectStoreExcludes.append("realm/object-store/impl/apple/external_commit_helper.cpp")
 #else
-
+objectStoreExcludes.append("realm/object-store/impl/epoll/external_commit_helper.cpp")
 #endif
 
 let package = Package(
