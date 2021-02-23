@@ -54,6 +54,7 @@ class Array;
 class Expression;
 class Group;
 class Transaction;
+class LinkMap;
 
 namespace metrics {
 class QueryInfo;
@@ -209,6 +210,7 @@ public:
     Query& contains(ColKey column_key, StringData value, bool case_sensitive = true);
     Query& like(ColKey column_key, StringData value, bool case_sensitive = true);
     Query& fulltext(ColKey column_key, StringData value);
+    Query& fulltext(ColKey column_key, StringData value, const LinkMap&);
 
     // These are shortcuts for equal(StringData(c_str)) and
     // not_equal(StringData(c_str)), and are needed to avoid unwanted
