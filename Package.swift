@@ -134,8 +134,8 @@ var coreTestsTarget = PackageDescription.Target.target(
     name: "CoreTests",
     dependencies: [
         "SyncServer",
-        "ObjectStore", // needed for bson symbols
-        "QueryParser"
+        "RealmObjectStore", // needed for bson symbols
+        "RealmQueryParser"
     ],
     path: "test",
     exclude: coreTestsExcludes,
@@ -260,24 +260,24 @@ let package = Package(
         .library(
             name: "RealmStorage",
             type: .dynamic,
-            targets: ["Storage"]),
+            targets: ["RealmStorage"]),
         .library(
             name: "RealmQueryParser",
             type: .dynamic,
-            targets: ["QueryParser"]),
+            targets: ["RealmQueryParser"]),
         .library(
             name: "RealmSyncClient",
             type: .dynamic,
-            targets: ["SyncClient"]
+            targets: ["RealmSyncClient"]
         ),
         .library(
             name: "RealmObjectStore",
             type: .dynamic,
-            targets: ["ObjectStore"]),
+            targets: ["RealmObjectStore"]),
         .library(
             name: "RealmCapi",
             type: .dynamic,
-            targets: ["Capi"]),
+            targets: ["RealmCapi"]),
         .library(
             name: "RealmFFI",
             type: .dynamic,
@@ -305,7 +305,7 @@ let package = Package(
             publicHeadersPath: "."
         ),
         .target(
-            name: "Storage",
+            name: "RealmStorage",
             dependencies: ["Bid"],
             path: "src",
             exclude: [
@@ -333,8 +333,8 @@ let package = Package(
             ]
         ),
         .target(
-            name: "QueryParser",
-            dependencies: ["Storage"],
+            name: "RealmQueryParser",
+            dependencies: ["RealmStorage"],
             path: "src",
             sources: ["realm/parser"],
             publicHeadersPath: "realm/parser",
@@ -344,8 +344,8 @@ let package = Package(
                 .headerSearchPath("realm/parser")
             ] + cxxSettings),
         .target(
-            name: "SyncClient",
-            dependencies: ["Storage"],
+            name: "RealmSyncClient",
+            dependencies: ["RealmStorage"],
             path: "src",
             exclude: syncClientExcludes,
             sources: [
@@ -391,9 +391,9 @@ let package = Package(
             ] + cxxSettings
         ),*/
         .target(
-            name: "ObjectStore",
+            name: "RealmObjectStore",
             dependencies: [
-                "SyncClient",
+                "RealmSyncClient",
 //                ._targetItem(name: "ExternalCommitHelper",
 //                             condition: .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
  //               ._targetItem(name: "ExternalCommitHelperLinux",
@@ -417,8 +417,8 @@ let package = Package(
                 .linkedLibrary("z")
             ]),
         .target(
-            name: "Capi",
-            dependencies: ["ObjectStore", "QueryParser"],
+            name: "RealmCapi",
+            dependencies: ["RealmObjectStore", "RealmQueryParser"],
             path: "src",
             exclude: [
                 "realm/object-store/c_api/realm.c"
@@ -440,7 +440,7 @@ let package = Package(
             ]),
         .target(
             name: "PureCapi",
-            dependencies: ["Capi"],
+            dependencies: ["RealmCapi"],
             path: "src",
             sources: ["realm/object-store/c_api/realm.c"],
             publicHeadersPath: "include",
@@ -467,7 +467,7 @@ let package = Package(
         */.target(
             name: "SyncServer",
             dependencies: [
-                "SyncClient"
+                "RealmSyncClient"
             ],
             path: "src",
             exclude: syncCommandSources,
@@ -482,7 +482,7 @@ let package = Package(
         .target(
             name: "SyncCommand",
             dependencies: [
-                "SyncClient"
+                "RealmSyncClient"
             ],
             path: "src",
             exclude: syncServerSources,
@@ -497,8 +497,8 @@ let package = Package(
             name: "ObjectStoreTests",
             dependencies: [
               //"SyncClient",
-              "ObjectStore",
-              "QueryParser",
+              "RealmObjectStore",
+              "RealmQueryParser",
               "SyncServer",
               //"ObjectStoreTestUtils"
             ],
