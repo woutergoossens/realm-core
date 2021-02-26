@@ -262,12 +262,16 @@ let package = Package(
             targets: ["Storage"]),
         .library(
             name: "RealmQueryParser",
+            type: .dynamic,
             targets: ["QueryParser"]),
         .library(
             name: "RealmSyncClient",
-            targets: ["SyncClient"]),
+            type: .dynamic,
+            targets: ["SyncClient"]
+        ),
         .library(
             name: "RealmObjectStore",
+            type: .dynamic,
             targets: ["ObjectStore"]),
         .library(
             name: "RealmCapi",
@@ -466,7 +470,9 @@ let package = Package(
             exclude: syncCommandSources,
             sources: syncServerSources,
             publicHeadersPath: "realm/sync/impl", // hack
-            cxxSettings: cxxSettings,
+            cxxSettings: cxxSettings + [
+                .headerSearchPath(".")
+            ],
             linkerSettings: [
                 .linkedFramework("Foundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
             ]),
@@ -505,6 +511,7 @@ let package = Package(
                 .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
                 .define("REALM_HAVE_UV", to: "1", .when(platforms: [.linux])),
                 .headerSearchPath("."),
+                .headerSearchPath("../../src"),
                 .headerSearchPath("../../external/catch/single_include"),
                           ] + cxxSettings) as [CXXSetting],
             linkerSettings: [
