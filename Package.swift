@@ -72,10 +72,11 @@ syncClientExcludes.append("realm/sync/crypto_server_openssl.cpp")
 
 // MARK: ObjectStore Exclusions
 var objectStoreExcludes = [
-  "realm/object-store/util/generic",
-  "realm/object-store/impl/windows",
-  "realm/object-store/c_api",
-  "realm/object-store/impl/generic",
+    "realm/object-store/util/generic",
+    "realm/object-store/impl/windows",
+    "realm/object-store/c_api",
+    "realm/object-store/impl/generic",
+    "realm/object-store/bson/bson.cpp" // needed by sync client
 ]
 #if os(Linux)
 objectStoreExcludes.append("realm/object-store/impl/apple/keychain_helper.cpp")
@@ -345,7 +346,8 @@ let package = Package(
                 "realm/util/network.cpp",
                 "realm/util/network_ssl.cpp",
                 "realm/util/http.cpp",
-                "realm/util/websocket.cpp"
+                "realm/util/websocket.cpp",
+                "realm/object-store/bson/bson.cpp"
             ],
             publicHeadersPath: "realm/sync",
             cxxSettings: [
