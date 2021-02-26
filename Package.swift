@@ -76,7 +76,7 @@ var objectStoreExcludes = [
     "realm/object-store/impl/windows",
     "realm/object-store/c_api",
     "realm/object-store/impl/generic",
-    "realm/object-store/bson/bson.cpp" // needed by sync client
+    "realm/object-store/util/bson" // needed by sync client
 ]
 #if os(Linux)
 objectStoreExcludes.append("realm/object-store/impl/apple/keychain_helper.cpp")
@@ -259,6 +259,7 @@ let package = Package(
     products: [
         .library(
             name: "RealmStorage",
+            type: .dynamic,
             targets: ["Storage"]),
         .library(
             name: "RealmQueryParser",
@@ -275,9 +276,11 @@ let package = Package(
             targets: ["ObjectStore"]),
         .library(
             name: "RealmCapi",
+            type: .dynamic,
             targets: ["Capi"]),
         .library(
             name: "RealmFFI",
+            type: .dynamic,
             targets: ["RealmFFI"]),
         .executable(name: "RealmObjectStoreTests", targets: ["ObjectStoreTests"])
     ],
@@ -351,7 +354,7 @@ let package = Package(
                 "realm/util/network_ssl.cpp",
                 "realm/util/http.cpp",
                 "realm/util/websocket.cpp",
-                "realm/object-store/bson/bson.cpp"
+                "realm/object-store/util/bson"
             ],
             publicHeadersPath: "realm/sync",
             cxxSettings: [
