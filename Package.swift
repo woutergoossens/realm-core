@@ -257,27 +257,27 @@ let package = Package(
         .watchOS(.v2)
     ],
     products: [
-        .library(
-            name: "RealmStorage",
-            type: .dynamic,
-            targets: ["RealmStorage"]),
-        .library(
-            name: "RealmQueryParser",
-            type: .dynamic,
-            targets: ["RealmQueryParser"]),
-        .library(
-            name: "RealmSyncClient",
-            type: .dynamic,
-            targets: ["RealmSyncClient"]
-        ),
+//        .library(
+//            name: "RealmStorage",
+//            type: .dynamic,
+//            targets: ["RealmStorage"]),
+//        .library(
+//            name: "RealmQueryParser",
+//            type: .dynamic,
+//            targets: ["RealmQueryParser"]),
+//        .library(
+//            name: "RealmSyncClient",
+//            type: .dynamic,
+//            targets: ["RealmSyncClient"]
+//        ),
         .library(
             name: "RealmObjectStore",
             type: .dynamic,
             targets: ["RealmObjectStore"]),
         .library(
-            name: "RealmCapi",
+            name: "PureCapi",
             type: .dynamic,
-            targets: ["RealmCapi"]),
+            targets: ["PureCapi"]),
         .library(
             name: "RealmFFI",
             type: .dynamic,
