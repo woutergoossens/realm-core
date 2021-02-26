@@ -22,8 +22,7 @@ let cxxSettings: [CXXSetting] = [
     .define("REALM_VERSION_EXTRA", to: "\"\(versionExtra)\""),
     .define("REALM_VERSION_STRING", to: "\"\(versionStr)\""),
     .define("REALM_NOINST_ROOT_CERTS", to: "0"),
-    .define("REALM_HAVE_UV", to: "1", .when(platforms: [.linux])),
-    .unsafeFlags(["-std=c++17"])
+    .define("REALM_HAVE_UV", to: "1", .when(platforms: [.linux]))
 ]
 
 var syncServerSources = [
