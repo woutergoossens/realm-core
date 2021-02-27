@@ -7,8 +7,7 @@
 #include "realm/parser/keypath_mapping.hpp"
 #include "realm/parser/query_parser.hpp"
 
-//#define YY_DECL int yylex(void* yyscanner)
-#define YY_DECL yy::parser::symbol_type yylex(void* yyscanner, int t = 0)
+#define YY_DECL yy::parser::symbol_type yylex(void* yyscanner)
 #include "realm/parser/generated/query_bison.hpp"
 YY_DECL;
 
