@@ -27,12 +27,17 @@ let cxxSettings: [CXXSetting] = [
 
 var syncServerSources = [
     "realm/sync/encrypt",
-    "realm/sync/noinst",
+    "realm/sync/noinst/file_descriptors.cpp",
+    "realm/sync/noinst/reopening_file_logger.cpp",
+    "realm/sync/noinst/server_dir.cpp",
+    "realm/sync/noinst/server_file_access_cache.cpp",
+    "realm/sync/noinst/server_history.cpp",
+    "realm/sync/noinst/server_legacy_migration.cpp",
+    "realm/sync/noinst/vacuum.cpp",
     "realm/sync/access_control.cpp",
     "realm/sync/metrics.cpp",
     "realm/sync/server_configuration.cpp",
-    "realm/sync/server.cpp",
-    "realm/sync/noinst/client_impl_base.cpp",
+    "realm/sync/server.cpp"
 ]
 
 #if os(Linux)
@@ -61,7 +66,8 @@ let syncCommandSources = [
 var syncClientExcludes = syncServerSources + syncCommandSources
 #if os(Linux)
 syncClientExcludes.append("realm/sync/crypto_server_apple.mm")
-syncClientExcludes.append("realm/sync/noinst")
+#else
+syncClientExcludes.append("realm/sync/crypto_server_openssl.cpp")
 #endif
 
 // MARK: ObjectStore Exclusions
@@ -251,19 +257,16 @@ let package = Package(
         .watchOS(.v2)
     ],
     products: [
-//        .library(
-//            name: "RealmStorage",
-//            type: .dynamic,
-//            targets: ["RealmStorage"]),
-//        .library(
-//            name: "RealmQueryParser",
-//            type: .dynamic,
-//            targets: ["RealmQueryParser"]),
-//        .library(
-//            name: "RealmSyncClient",
-//            type: .dynamic,
-//            targets: ["RealmSyncClient"]
-//        ),
+        .library(
+            name: "RealmStorage",
+            targets: ["RealmStorage"]),
+        .library(
+            name: "RealmQueryParser",
+            targets: ["RealmQueryParser"]),
+        .library(
+            name: "RealmSyncClient",
+            targets: ["RealmSyncClient"]
+        ),
         .library(
             name: "RealmObjectStore",
             targets: ["RealmObjectStore"]),
@@ -424,10 +427,10 @@ let package = Package(
                 .headerSearchPath("external/pegtl/include/tao")
                           ] + cxxSettings) as [CXXSetting],
             linkerSettings: [
-              .linkedLibrary("pthread"),
-              .linkedLibrary("uv"),
-              .linkedLibrary("m"),
-              .linkedLibrary("crypto")
+              .linkedLibrary("pthread", .when(platforms: [.linux])),
+              .linkedLibrary("uv", .when(platforms: [.linux])),
+              .linkedLibrary("m", .when(platforms: [.linux])),
+              .linkedLibrary("crypto", .when(platforms: [.linux]))
             ]),
         .target(
             name: "PureCapi",
@@ -470,20 +473,22 @@ let package = Package(
             linkerSettings: [
                 .linkedFramework("Foundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
             ]),
-        .target(
-            name: "SyncCommand",
-            dependencies: [
-                "RealmSyncClient"
-            ],
-            path: "src",
-            exclude: syncServerSources,
-            sources: syncCommandSources,
-            publicHeadersPath: "realm/sync/impl", // hack
-            cxxSettings: cxxSettings,
-            linkerSettings: [
-                .linkedFramework("Foundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-            ]),
-        coreTestsTarget,
+//        .target(
+//            name: "SyncCommand",
+//            dependencies: [
+//                "RealmSyncClient"
+//            ],
+//            path: "src",
+//            exclude: syncServerSources,
+//            sources: syncCommandSources,
+//            publicHeadersPath: "realm/sync/impl", // hack
+//            cxxSettings: cxxSettings + [
+//                .headerSearchPath("realm/sync"),
+//                .headerSearchPath("realm/util")
+//            ],
+//            linkerSettings: [
+//                .linkedFramework("Foundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
+//            ]),
         .target(
             name: "ObjectStoreTests",
             dependencies: [
@@ -509,10 +514,10 @@ let package = Package(
                 .headerSearchPath("../../external/catch/single_include"),
                           ] + cxxSettings) as [CXXSetting],
             linkerSettings: [
-              .linkedLibrary("pthread"),
-              .linkedLibrary("uv"),
-              .linkedLibrary("m"),
-              .linkedLibrary("crypto")
+              .linkedLibrary("pthread", .when(platforms: [.linux])),
+              .linkedLibrary("uv", .when(platforms: [.linux])),
+              .linkedLibrary("m", .when(platforms: [.linux])),
+              .linkedLibrary("crypto", .when(platforms: [.linux]))
             ]
         ),
 /*        .target(
