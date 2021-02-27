@@ -79,41 +79,15 @@ syncClientExcludes.append("realm/sync/crypto_server_openssl.cpp")
 var objectStoreExcludes = [
     "realm/object-store/util/generic",
     "realm/object-store/impl/windows",
-    "realm/object-store/c_api",
     "realm/object-store/impl/generic"
 ]
 #if os(Linux)
 objectStoreExcludes.append("realm/object-store/impl/apple/keychain_helper.cpp")
 objectStoreExcludes.append("realm/object-store/impl/apple/external_commit_helper.cpp")
-objectStoreExcludes.append("realm/object-store/util/app")
+objectStoreExcludes.append("realm/object-store/util/apple")
 #else
 objectStoreExcludes.append("realm/object-store/impl/epoll/external_commit_helper.cpp")
 #endif
-
-let purCapi = PackageDescription.Target.target(
-    name: "PureCapi",
-    dependencies: ["Capi"],
-    path: "src",
-    sources: ["realm/object-store/c_api/realm.c"],
-    publicHeadersPath: "realm.h",
-    cSettings: [.headerSearchPath(".")]
-)
-
-//            exclude: [
-//                "realm/tools",
-//                "realm/parser",
-//                "realm/metrics",
-//                "realm/exec",
-//                "realm/object-store",
-//                "realm/sync",
-//                "external",
-//                "win32",
-//                "realm/util/network.cpp",
-//                "realm/util/network_ssl.cpp",
-//                "realm/util/http.cpp",
-//                "realm/util/websocket.cpp",
-//                "realm/realm.h"
-//            ],
 
 let bid = PackageDescription.Target.target(
     name: "Bid",
@@ -145,7 +119,6 @@ let realmCore = PackageDescription.Target.target(
         "realm/tools",
         "win32",
         "external",
-        "realm/realm.h",
         "realm/object-store/c_api/realm.c"
     ] + syncClientExcludes + objectStoreExcludes,
     sources: [
@@ -210,7 +183,13 @@ let package = Package(
             path: "src",
             sources: ["realm/object-store/c_api/realm.c"],
             publicHeadersPath: "include",
-            cSettings: [.headerSearchPath(".")]
+            cSettings: [.headerSearchPath(".")],
+            linkerSettings: [
+              .linkedLibrary("pthread", .when(platforms: [.linux])),
+              .linkedLibrary("uv", .when(platforms: [.linux])),
+              .linkedLibrary("m", .when(platforms: [.linux])),
+              .linkedLibrary("crypto", .when(platforms: [.linux]))
+            ]
         ),
         .target(
             name: "RealmFFI",
