@@ -27,17 +27,12 @@ let cxxSettings: [CXXSetting] = [
 
 var syncServerSources = [
     "realm/sync/encrypt",
-    "realm/sync/noinst/file_descriptors.cpp",
-    "realm/sync/noinst/reopening_file_logger.cpp",
-    "realm/sync/noinst/server_dir.cpp",
-    "realm/sync/noinst/server_file_access_cache.cpp",
-    "realm/sync/noinst/server_history.cpp",
-    "realm/sync/noinst/server_legacy_migration.cpp",
-    "realm/sync/noinst/vacuum.cpp",
+    "realm/sync/noinst",
     "realm/sync/access_control.cpp",
     "realm/sync/metrics.cpp",
     "realm/sync/server_configuration.cpp",
-    "realm/sync/server.cpp"
+    "realm/sync/server.cpp",
+    "realm/sync/noinst/client_impl_base.cpp",
 ]
 
 #if os(Linux)
@@ -66,8 +61,7 @@ let syncCommandSources = [
 var syncClientExcludes = syncServerSources + syncCommandSources
 #if os(Linux)
 syncClientExcludes.append("realm/sync/crypto_server_apple.mm")
-#else
-syncClientExcludes.append("realm/sync/crypto_server_openssl.cpp")
+syncClientExcludes.append("realm/sync/noinst")
 #endif
 
 // MARK: ObjectStore Exclusions
