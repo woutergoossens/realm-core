@@ -272,15 +272,12 @@ let package = Package(
 //        ),
         .library(
             name: "RealmObjectStore",
-            type: .dynamic,
             targets: ["RealmObjectStore"]),
         .library(
             name: "PureCapi",
-            type: .dynamic,
             targets: ["PureCapi"]),
         .library(
             name: "RealmFFI",
-            type: .dynamic,
             targets: ["RealmFFI"]),
         .executable(name: "RealmObjectStoreTests", targets: ["ObjectStoreTests"])
     ],
