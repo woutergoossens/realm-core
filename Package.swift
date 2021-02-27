@@ -146,8 +146,7 @@ let realmCore = PackageDescription.Target.target(
         "realm/tools",
         "win32",
         "external",
-        "realm/realm.h",
-        "realm/parser/generated"
+        "realm/realm.h"
     ] + syncClientExcludes + objectStoreExcludes,
     sources: [
         "realm"
@@ -177,20 +176,20 @@ let package = Package(
         .library(
             name: "RealmStorage",
             targets: ["RealmStorage"]),
-        .library(name: "RealmCapi", targets: ["RealmStorage", "RealmCapi"]),
+        .library(name: "RealmCapi", targets: ["RealmCapi"]),
         .library(
             name: "PureCapi",
             targets: ["PureCapi"]),
         .library(
             name: "RealmFFI",
-            targets: ["RealmFFI"])
+            targets: ["RealmFFI", "PureCapi", "RealmCapi", "RealmStorage"])
     ],
     targets: [
         bid,
         realmCore,
         .target(
             name: "RealmCapi",
-            dependencies: [],
+            dependencies: ["RealmStorage"],
             path: "src",
             exclude: [
                 "realm/object-store/c_api/realm.c"
@@ -198,11 +197,8 @@ let package = Package(
             sources: ["realm/object-store/c_api"],
             publicHeadersPath: "realm/object-store/c_api",
             cxxSettings: ([
-//                .define("REALM_ENABLE_SYNC", to: "1"),
-//                .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
                 .headerSearchPath("."),
-//                .headerSearchPath("realm/object-store/c_api"),
-                          ] + cxxSettings) as [CXXSetting],
+            ] + cxxSettings) as [CXXSetting],
             linkerSettings: [
               .linkedLibrary("pthread", .when(platforms: [.linux])),
               .linkedLibrary("uv", .when(platforms: [.linux])),
@@ -224,5 +220,5 @@ let package = Package(
             sources: ["swift"]
         )
     ],
-    cxxLanguageStandard: .gnucxx1z
+    cxxLanguageStandard: .cxx1z
 )
