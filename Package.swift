@@ -140,22 +140,22 @@ let realmCore = PackageDescription.Target.target(
     dependencies: ["Bid"],
     path: "src",
     exclude: [
-        "realm/object-store/c_api",
         "realm/exec",
         "realm/metrics",
         "realm/tools",
         "win32",
         "external",
-        "realm/realm.h"
+        "realm/realm.h",
+        "realm/object-store/c_api/realm.c"
     ] + syncClientExcludes + objectStoreExcludes,
     sources: [
         "realm"
     ],
     publicHeadersPath: "realm",
     cxxSettings: cxxSettings + [
-      .headerSearchPath("."),
-       .headerSearchPath("realm/parser/generated"),
-      .headerSearchPath("external/pegtl/include/tao")
+        .headerSearchPath("."),
+        .headerSearchPath("realm/parser/generated"),
+        .headerSearchPath("external/pegtl/include/tao")
     ],
     linkerSettings: [
         .linkedFramework("CoreFoundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
@@ -176,38 +176,37 @@ let package = Package(
         .library(
             name: "RealmStorage",
             targets: ["RealmStorage"]),
-        .library(name: "RealmCapi", targets: ["RealmCapi"]),
         .library(
             name: "PureCapi",
             targets: ["PureCapi"]),
         .library(
             name: "RealmFFI",
-            targets: ["RealmFFI", "PureCapi", "RealmCapi", "RealmStorage"])
+            targets: ["RealmFFI"])
     ],
     targets: [
         bid,
         realmCore,
-        .target(
-            name: "RealmCapi",
-            dependencies: ["RealmStorage"],
-            path: "src",
-            exclude: [
-                "realm/object-store/c_api/realm.c"
-            ],
-            sources: ["realm/object-store/c_api"],
-            publicHeadersPath: "realm/object-store/c_api",
-            cxxSettings: ([
-                .headerSearchPath("."),
-            ] + cxxSettings) as [CXXSetting],
-            linkerSettings: [
-              .linkedLibrary("pthread", .when(platforms: [.linux])),
-              .linkedLibrary("uv", .when(platforms: [.linux])),
-              .linkedLibrary("m", .when(platforms: [.linux])),
-              .linkedLibrary("crypto", .when(platforms: [.linux]))
-            ]),
+//        .target(
+//            name: "RealmCapi",
+//            dependencies: ["RealmStorage"],
+//            path: "src",
+//            exclude: [
+//                "realm/object-store/c_api/realm.c"
+//            ],
+//            sources: ["realm/object-store/c_api"],
+//            publicHeadersPath: "realm/object-store/c_api",
+//            cxxSettings: ([
+//                .headerSearchPath("."),
+//            ] + cxxSettings) as [CXXSetting],
+//            linkerSettings: [
+//              .linkedLibrary("pthread", .when(platforms: [.linux])),
+//              .linkedLibrary("uv", .when(platforms: [.linux])),
+//              .linkedLibrary("m", .when(platforms: [.linux])),
+//              .linkedLibrary("crypto", .when(platforms: [.linux]))
+//            ]),
         .target(
             name: "PureCapi",
-            dependencies: ["RealmCapi"],
+            dependencies: ["RealmStorage"],
             path: "src",
             sources: ["realm/object-store/c_api/realm.c"],
             publicHeadersPath: "include",
