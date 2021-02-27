@@ -9,7 +9,7 @@ let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
 
 let cxxSettings: [CXXSetting] = [
-    .headerSearchPath("src"),
+//    .headerSearchPath("src"),
     .define("REALM_DEBUG", .when(configuration: .debug)),
     .define("REALM_NO_CONFIG"),
     .define("REALM_INSTALL_LIBEXECDIR", to: ""),
@@ -146,7 +146,8 @@ let realmCore = PackageDescription.Target.target(
         "realm/tools",
         "win32",
         "external",
-        "realm/realm.h"
+        "realm/realm.h",
+        "realm/parser/generated"
     ] + syncClientExcludes + objectStoreExcludes,
     sources: [
         "realm"
@@ -154,6 +155,7 @@ let realmCore = PackageDescription.Target.target(
     publicHeadersPath: "realm",
     cxxSettings: cxxSettings + [
       .headerSearchPath("."),
+       .headerSearchPath("realm/parser/generated"),
       .headerSearchPath("external/pegtl/include/tao")
     ],
     linkerSettings: [
@@ -175,6 +177,7 @@ let package = Package(
         .library(
             name: "RealmStorage",
             targets: ["RealmStorage"]),
+        .library(name: "RealmCapi", targets: ["RealmStorage", "RealmCapi"]),
         .library(
             name: "PureCapi",
             targets: ["PureCapi"]),
@@ -187,7 +190,7 @@ let package = Package(
         realmCore,
         .target(
             name: "RealmCapi",
-            dependencies: ["RealmStorage"],
+            dependencies: [],
             path: "src",
             exclude: [
                 "realm/object-store/c_api/realm.c"
@@ -198,7 +201,7 @@ let package = Package(
 //                .define("REALM_ENABLE_SYNC", to: "1"),
 //                .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
                 .headerSearchPath("."),
-                .headerSearchPath("realm/object-store/c_api"),
+//                .headerSearchPath("realm/object-store/c_api"),
                           ] + cxxSettings) as [CXXSetting],
             linkerSettings: [
               .linkedLibrary("pthread", .when(platforms: [.linux])),
@@ -221,5 +224,5 @@ let package = Package(
             sources: ["swift"]
         )
     ],
-    cxxLanguageStandard: .cxx1z
+    cxxLanguageStandard: .gnucxx1z
 )
