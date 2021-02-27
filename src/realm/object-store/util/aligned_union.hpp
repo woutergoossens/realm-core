@@ -53,8 +53,8 @@ namespace util {
 // Provide our own implementation of `std::aligned_union` as it is missing from GCC 4.9.
 template <size_t Len, typename... Types>
 struct AlignedUnion {
-    static constexpr size_t alignment_value = _impl::constexpr_max({alignof(Types)...});
-    static constexpr size_t storage_size = _impl::constexpr_max({Len, sizeof(Types)...});
+    static constexpr size_t alignment_value = ::realm::_impl::constexpr_max({alignof(Types)...});
+    static constexpr size_t storage_size = ::realm::_impl::constexpr_max({Len, sizeof(Types)...});
     using type = typename std::aligned_storage<storage_size, alignment_value>::type;
 };
 

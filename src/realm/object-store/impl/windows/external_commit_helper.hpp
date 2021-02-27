@@ -16,6 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#if REALM_PLATFORM_WINDOWS
+
 #include <realm/db.hpp>
 
 #include <future>
@@ -134,3 +136,4 @@ private:
 
 } // namespace _impl
 } // namespace realm
+#endif

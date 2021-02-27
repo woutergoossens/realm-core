@@ -22,7 +22,8 @@ let cxxSettings: [CXXSetting] = [
     .define("REALM_VERSION_EXTRA", to: "\"\(versionExtra)\""),
     .define("REALM_VERSION_STRING", to: "\"\(versionStr)\""),
     .define("REALM_NOINST_ROOT_CERTS", to: "0"),
-    .define("REALM_HAVE_UV", to: "1", .when(platforms: [.linux]))
+    .define("REALM_HAVE_UV", to: "1", .when(platforms: [.linux])),
+      .define("REALM_USE_UV", to: "1", .when(platforms: [.linux]))
 ]
 
 var syncServerSources = [
@@ -75,12 +76,12 @@ var objectStoreExcludes = [
     "realm/object-store/util/generic",
     "realm/object-store/impl/windows",
     "realm/object-store/c_api",
-    "realm/object-store/impl/generic",
-    "realm/object-store/util/bson" // needed by sync client
+    "realm/object-store/impl/generic"
 ]
 #if os(Linux)
 objectStoreExcludes.append("realm/object-store/impl/apple/keychain_helper.cpp")
 objectStoreExcludes.append("realm/object-store/impl/apple/external_commit_helper.cpp")
+objectStoreExcludes.append("realm/object-store/util/app")
 #else
 objectStoreExcludes.append("realm/object-store/impl/epoll/external_commit_helper.cpp")
 #endif
@@ -141,18 +142,20 @@ let realmCore = PackageDescription.Target.target(
         "realm/tools",
         "win32",
         "external",
-        "realm/realm.h"
+        "realm/realm.h",
+        "realm/parser/generated"
     ] + syncClientExcludes + objectStoreExcludes,
     sources: [
         "realm"
     ],
     publicHeadersPath: "realm",
     cxxSettings: cxxSettings + [
-        .headerSearchPath("."),
-        .define("REALM_ENABLE_SYNC", to: "1"),
-        .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-        .define("REALM_HAVE_EPOLL", to: "1", .when(platforms: [.linux])),
-        .define("REALM_HAVE_UV", to: "1", .when(platforms: [.linux])),
+      .headerSearchPath("."),
+      .headerSearchPath("external/pegtl/include/tao"),
+      .define("REALM_ENABLE_SYNC", to: "1"),
+      .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
+      .define("REALM_HAVE_EPOLL", to: "1", .when(platforms: [.linux])),
+      .define("REALM_HAVE_UV", to: "1", .when(platforms: [.linux])),
     ],
     linkerSettings: [
         .linkedFramework("CoreFoundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
@@ -197,7 +200,6 @@ let package = Package(
                 .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
                 .headerSearchPath("."),
                 .headerSearchPath("realm/object-store/c_api"),
-                .headerSearchPath("external/pegtl/include/tao")
                           ] + cxxSettings) as [CXXSetting],
             linkerSettings: [
               .linkedLibrary("pthread", .when(platforms: [.linux])),

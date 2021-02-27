@@ -19,6 +19,7 @@
 #include <atomic>
 #include <thread>
 #include <uv.h>
+#include <realm/object-store/util/scheduler.hpp>
 
 namespace {
 using namespace realm;

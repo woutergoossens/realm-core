@@ -16,6 +16,9 @@
  *
  **************************************************************************/
 
+#ifndef REALM_AES_CRYPTOR
+#define REALM_AES_CRYPTOR
+
 #include <cstddef>
 #include <memory>
 #include <realm/util/features.h>
@@ -111,3 +114,4 @@ struct SharedFileInfo {
 }
 
 #endif // REALM_ENABLE_ENCRYPTION
+#endif // REALM_AES_CRYPTOR

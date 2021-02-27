@@ -16,6 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#if REALM_PLATFORM_APPLE
+
 #include <realm/util/to_string.hpp>
 
 #include <atomic>
@@ -224,3 +226,4 @@ std::shared_ptr<Scheduler> Scheduler::make_dispatch(void* queue)
 }
 } // namespace util
 } // namespace realm
+#endif

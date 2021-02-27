@@ -16,6 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#if !REALM_PLATFORM_APPLE && !REALM_HAVE_UV && !REALM_PLATFORM_ANDROID
 #include <realm/db.hpp>
 
 #include <future>
@@ -47,3 +48,4 @@ private:
 
 } // namespace _impl
 } // namespace realm
+#endif

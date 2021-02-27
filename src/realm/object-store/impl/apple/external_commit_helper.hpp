@@ -16,6 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#if REALM_PLATFORM_APPLE
+
 #include <thread>
 
 namespace realm {
@@ -85,3 +87,4 @@ private:
 };
 } // namespace _impl
 } // namespace realm
+#endif

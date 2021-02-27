@@ -28,7 +28,6 @@
 #elif defined(_WIN32)
 #include <realm/object-store/impl/windows/external_commit_helper.hpp>
 #else
-#warning "The GenericExternalCommitHelper has been selected. Notifications won't be delivered properly"
 #include <realm/object-store/impl/generic/external_commit_helper.hpp>
 #endif
 

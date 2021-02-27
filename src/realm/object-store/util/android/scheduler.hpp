@@ -16,6 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#if REALM_PLATFORM_ANDROID
+
 #include <algorithm>
 #include <memory>
 #include <mutex>
@@ -221,3 +223,4 @@ std::shared_ptr<Scheduler> Scheduler::make_default()
 }
 } // namespace util
 } // namespace realm
+#endif

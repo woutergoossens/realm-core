@@ -16,6 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#if !REALM_PLATFORM_APPLE && !REALM_HAVE_UV && !REALM_PLATFORM_ANDROID
 #include <thread>
 
 namespace {
@@ -60,3 +61,4 @@ std::shared_ptr<Scheduler> Scheduler::make_default()
 }
 } // namespace util
 } // namespace realm
+#endif
