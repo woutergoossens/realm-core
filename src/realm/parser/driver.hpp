@@ -7,7 +7,12 @@
 #include "realm/parser/keypath_mapping.hpp"
 #include "realm/parser/query_parser.hpp"
 
+#if REALM_HAVE_UV
+#define YY_DECL yy::parser::symbol_type yylex(void* yyscanner, int i = 0)
+#else
 #define YY_DECL yy::parser::symbol_type yylex(void* yyscanner)
+#endif
+
 #include "realm/parser/generated/query_bison.hpp"
 YY_DECL;
 
