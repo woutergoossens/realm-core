@@ -15,6 +15,8 @@
 // limitations under the License.
 //
 ////////////////////////////////////////////////////////////////////////////
+#ifndef EXTERNAL_COMMIT_HELPER_EPOLL
+#define EXTERNAL_COMMIT_HELPER_EPOLL
 
 #include <memory>
 #include <mutex>
@@ -74,3 +76,5 @@ private:
 
 } // namespace _impl
 } // namespace realm
+
+#endif
