@@ -424,10 +424,10 @@ let package = Package(
                 .headerSearchPath("external/pegtl/include/tao")
                           ] + cxxSettings) as [CXXSetting],
             linkerSettings: [
-              .linkedLibrary("pthread", .when(platforms: [.linux])),
-              .linkedLibrary("uv", .when(platforms: [.linux])),
-              .linkedLibrary("m", .when(platforms: [.linux])),
-              .linkedLibrary("crypto", .when(platforms: [.linux]))
+              .linkedLibrary("pthread"),
+              .linkedLibrary("uv"),
+              .linkedLibrary("m"),
+              .linkedLibrary("crypto")
             ]),
         .target(
             name: "PureCapi",
@@ -509,10 +509,10 @@ let package = Package(
                 .headerSearchPath("../../external/catch/single_include"),
                           ] + cxxSettings) as [CXXSetting],
             linkerSettings: [
-              .linkedLibrary("pthread", .when(platforms: [.linux])),
-              .linkedLibrary("uv", .when(platforms: [.linux])),
-              .linkedLibrary("m", .when(platforms: [.linux])),
-              .linkedLibrary("crypto", .when(platforms: [.linux]))
+              .linkedLibrary("pthread"),
+              .linkedLibrary("uv"),
+              .linkedLibrary("m"),
+              .linkedLibrary("crypto")
             ]
         ),
 /*        .target(
