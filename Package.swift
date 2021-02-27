@@ -85,161 +85,6 @@ objectStoreExcludes.append("realm/object-store/impl/apple/external_commit_helper
 objectStoreExcludes.append("realm/object-store/impl/epoll/external_commit_helper.cpp")
 #endif
 
-// MARK: CoreTests Exclusions
-var coreTestsExcludes = [
-    "bench",
-    "bench-sync",
-    "benchmark-common-tasks",
-    "benchmark-common-tasks-ios",
-    "benchmark-crud",
-    "benchmark-history-types",
-    "benchmark-index",
-    "benchmark-insert-add",
-    "benchmark-prealloc",
-    "benchmark-row-accessor",
-    "benchmark-transaction",
-    "benchmark-util-network",
-    "client",
-    "cloud_perf_test",
-    "compat",
-    "csv_test",
-    "experiments",
-    "fuzz",
-    "fuzzy",
-    "ios",
-    "large_tests",
-    "object-store",
-    "performance",
-    "protocol_compat",
-    "simple-connection",
-    "unit-tests-ios",
-    // Disabled tests
-    "test_sync.cpp",
-    "test_sync_multiserver.cpp",
-    "test_metrics.cpp",
-    "test_client_reset.cpp",
-    "test_client_reset_diff.cpp",
-    "test_client_reset_query_based.cpp",
-    "test_handshake.cpp",
-    "test_noinst_vacuum.cpp",
-]
-
-#if os(Linux)
-coreTestsExcludes.append("main.mm")
-#else
-coreTestsExcludes.append("main.cpp")
-#endif
-
-var coreTestsTarget = PackageDescription.Target.target(
-    name: "CoreTests",
-    dependencies: [
-        "SyncServer",
-        "RealmObjectStore", // needed for bson symbols
-        "RealmQueryParser"
-    ],
-    path: "test",
-    exclude: coreTestsExcludes,
-    cxxSettings: ([
-        .define("REALM_ENABLE_SYNC", to: "1"),
-        .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-        .define("REALM_HAVE_UV", to: "1", .when(platforms: [.linux])),
-        .headerSearchPath("."),
-        .headerSearchPath("../external/catch/single_include"),
-    ] + cxxSettings) as [CXXSetting],
-    linkerSettings: [
-      .linkedLibrary("pthread", .when(platforms: [.linux])),
-      .linkedLibrary("uv", .when(platforms: [.linux])),
-      .linkedLibrary("m", .when(platforms: [.linux])),
-      .linkedLibrary("crypto", .when(platforms: [.linux]))
-    ]
-)
-#if swift(>=5.3.1) && !os(Linux)
-//coreTestsTarget.resources = [
-//    .copy("resources"),
-//    .copy("stitch_private.pem"),
-//    .copy("stitch_public.pem"),
-//    .copy("test_pubkey.pem"),
-//    .copy("test_pubkey2.pem"),
-//    .copy("test_sync_ca.pem"),
-//    .copy("test_sync_key.pem"),
-//    .copy("test_token_expiration_null.json"),
-//    .copy("test_token_expiration_specified.json"),
-//    .copy("test_token_expiration_unspecified.json"),
-//    .copy("test_token_for_path.json"),
-//    .copy("test_token_readonly.json"),
-//    .copy("test_token_sync_label_custom.json"),
-//    .copy("test_token_sync_label_default.json"),
-//    .copy("test_token.json"),
-//
-//    .copy("test_upgrade_colkey_error.realm"),
-//    .copy("test_upgrade_database_4_1.realm"),
-//    .copy("test_upgrade_database_4_2.realm"),
-//    .copy("test_upgrade_database_4_3.realm"),
-//    .copy("test_upgrade_database_4_4_to_5_datetime1.realm"),
-//    .copy("test_upgrade_database_4_4.realm"),
-//    .copy("test_upgrade_database_4_5_to_6_stringindex.realm"),
-//    .copy("test_upgrade_database_4_6_to_7.realm"),
-//    .copy("test_upgrade_database_4_7_to_8.realm"),
-//    .copy("test_upgrade_database_4_8_to_9.realm"),
-//    .copy("test_upgrade_database_4_9_to_10.realm"),
-//    .copy("test_upgrade_database_4_10_to_11.realm"),
-//    .copy("test_upgrade_database_6.realm"),
-//    .copy("test_upgrade_database_9_to_10_pk_table.realm"),
-//    .copy("test_upgrade_database_1000_1.realm"),
-//    .copy("test_upgrade_database_1000_2.realm"),
-//    .copy("test_upgrade_database_1000_3.realm"),
-//    .copy("test_upgrade_database_1000_4_to_5_datetime1.realm"),
-//    .copy("test_upgrade_database_1000_4.realm"),
-//    .copy("test_upgrade_database_1000_5_to_6_stringindex.realm"),
-//    .copy("test_upgrade_database_1000_6_to_7.realm"),
-//    .copy("test_upgrade_database_1000_7_to_8.realm"),
-//    .copy("test_upgrade_database_1000_8_to_9.realm"),
-//    .copy("test_upgrade_database_1000_9_to_10.realm"),
-//    .copy("test_upgrade_database_1000_10_to_11.realm"),
-//    .copy("test_upgrade_progress_1.realm"),
-//    .copy("test_upgrade_progress_2.realm"),
-//    .copy("test_upgrade_progress_3.realm"),
-//    .copy("test_upgrade_progress_4.realm"),
-//    .copy("test_upgrade_progress_5.realm"),
-//    .copy("test_upgrade_progress_6.realm"),
-//    .copy("test_upgrade_progress_7.realm"),
-//
-//    .copy("test_util_network_ssl_ca.pem"),
-//    .copy("test_util_network_ssl_key.pem"),
-//
-//    .copy("test.pem"),
-//    .copy("expect_json.json"),
-//    .copy("expect_string.txt"),
-//    .copy("expect_test_upgrade_database_9_to_10.json"),
-//    .copy("expect_xjson_plus.json"),
-//    .copy("expect_xjson.json"),
-//    .copy("expected_json_link_cycles1.json"),
-//    .copy("expected_json_link_cycles2.json"),
-//    .copy("expected_json_link_cycles3.json"),
-//    .copy("expected_json_link_cycles4.json"),
-//    .copy("expected_json_link_cycles5.json"),
-//    .copy("expected_json_linklist_cycle1.json"),
-//    .copy("expected_json_linklist_cycle2.json"),
-//    .copy("expected_json_linklist_cycle3.json"),
-//    .copy("expected_json_linklist_cycle4.json"),
-//    .copy("expected_json_linklist_cycle5.json"),
-//    .copy("expected_json_linklist_cycle6.json"),
-//    .copy("expected_json_linklist1_1.json"),
-//    .copy("expected_json_linklist1_2.json"),
-//    .copy("expected_json_linklist1_3.json"),
-//    .copy("expected_json_linklist1_4.json"),
-//    .copy("expected_json_linklist1_5.json"),
-//    .copy("expected_json_linklist1_6.json"),
-//    .copy("expected_json_nulls.json"),
-//    .copy("expected_xjson_link.json"),
-//    .copy("expected_xjson_linklist1.json"),
-//    .copy("expected_xjson_linklist2.json"),
-//    .copy("expected_xjson_plus_link.json"),
-//    .copy("expected_xjson_plus_linklist1.json"),
-//    .copy("expected_xjson_plus_linklist2.json"),
-//]
-#endif
-
 let purCapi = PackageDescription.Target.target(
     name: "PureCapi",
     dependencies: ["Capi"],
@@ -248,6 +93,74 @@ let purCapi = PackageDescription.Target.target(
     publicHeadersPath: "realm.h",
     cSettings: [.headerSearchPath(".")]
 )
+
+//            exclude: [
+//                "realm/tools",
+//                "realm/parser",
+//                "realm/metrics",
+//                "realm/exec",
+//                "realm/object-store",
+//                "realm/sync",
+//                "external",
+//                "win32",
+//                "realm/util/network.cpp",
+//                "realm/util/network_ssl.cpp",
+//                "realm/util/http.cpp",
+//                "realm/util/websocket.cpp",
+//                "realm/realm.h"
+//            ],
+
+let bid = PackageDescription.Target.target(
+    name: "Bid",
+    path: "src/external/IntelRDFPMathLib20U2/LIBRARY/src",
+    sources: [
+        "bid128.c",
+        "bid128_compare.c",
+        "bid128_mul.c",
+        "bid128_div.c",
+        "bid128_add.c",
+        "bid128_fma.c",
+        "bid64_to_bid128.c",
+        "bid_convert_data.c",
+        "bid_decimal_data.c",
+        "bid_decimal_globals.c",
+        "bid_from_int.c",
+        "bid_round.c"
+    ],
+    publicHeadersPath: "."
+)
+
+let realmCore = PackageDescription.Target.target(
+    name: "RealmStorage",
+    dependencies: ["Bid"],
+    path: "src",
+    exclude: [
+        "realm/object-store/c_api",
+        "realm/exec",
+        "realm/metrics",
+        "realm/tools",
+        "win32",
+        "external",
+        "realm/realm.h"
+    ] + syncClientExcludes + objectStoreExcludes,
+    sources: [
+        "realm"
+    ],
+    publicHeadersPath: "realm",
+    cxxSettings: cxxSettings + [
+        .headerSearchPath("."),
+        .define("REALM_ENABLE_SYNC", to: "1"),
+        .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
+        .define("REALM_HAVE_EPOLL", to: "1", .when(platforms: [.linux])),
+        .define("REALM_HAVE_UV", to: "1", .when(platforms: [.linux])),
+    ],
+    linkerSettings: [
+        .linkedFramework("CoreFoundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
+        .linkedFramework("Security", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
+        .linkedLibrary("z")
+    ]
+)
+
 let package = Package(
     name: "RealmDatabase",
     platforms: [
@@ -261,158 +174,18 @@ let package = Package(
             name: "RealmStorage",
             targets: ["RealmStorage"]),
         .library(
-            name: "RealmQueryParser",
-            targets: ["RealmQueryParser"]),
-        .library(
-            name: "RealmSyncClient",
-            targets: ["RealmSyncClient"]
-        ),
-        .library(
-            name: "RealmObjectStore",
-            targets: ["RealmObjectStore"]),
-        .library(
             name: "PureCapi",
             targets: ["PureCapi"]),
         .library(
             name: "RealmFFI",
-            targets: ["RealmFFI"]),
-        .executable(name: "RealmObjectStoreTests", targets: ["ObjectStoreTests"])
+            targets: ["RealmFFI"])
     ],
     targets: [
-        .target(
-            name: "Bid",
-            path: "src/external/IntelRDFPMathLib20U2/LIBRARY/src",
-            sources: [
-                "bid128.c",
-                "bid128_compare.c",
-                "bid128_mul.c",
-                "bid128_div.c",
-                "bid128_add.c",
-                "bid128_fma.c",
-                "bid64_to_bid128.c",
-                "bid_convert_data.c",
-                "bid_decimal_data.c",
-                "bid_decimal_globals.c",
-                "bid_from_int.c",
-                "bid_round.c"
-            ],
-            publicHeadersPath: "."
-        ),
-        .target(
-            name: "RealmStorage",
-            dependencies: ["Bid"],
-            path: "src",
-            exclude: [
-                "realm/tools",
-                "realm/parser",
-                "realm/metrics",
-                "realm/exec",
-                "realm/object-store",
-                "realm/sync",
-                "external",
-                "win32",
-                "realm/util/network.cpp",
-                "realm/util/network_ssl.cpp",
-                "realm/util/http.cpp",
-                "realm/util/websocket.cpp",
-                "realm/realm.h"
-            ],
-            sources: [
-                "realm"
-            ],
-            publicHeadersPath: "realm",
-            cxxSettings: cxxSettings + [.headerSearchPath(".")],
-            linkerSettings: [
-                .linkedFramework("CoreFoundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS]))
-            ]
-        ),
-        .target(
-            name: "RealmQueryParser",
-            dependencies: ["RealmStorage"],
-            path: "src",
-            sources: ["realm/parser"],
-            publicHeadersPath: "realm/parser",
-            cxxSettings: [
-                .headerSearchPath("."),
-                .headerSearchPath("realm/parser/generated"),
-                .headerSearchPath("realm/parser")
-            ] + cxxSettings),
-        .target(
-            name: "RealmSyncClient",
-            dependencies: ["RealmStorage"],
-            path: "src",
-            exclude: syncClientExcludes,
-            sources: [
-                "realm/sync",
-                "realm/util/network.cpp",
-                "realm/util/network_ssl.cpp",
-                "realm/util/http.cpp",
-                "realm/util/websocket.cpp",
-                "realm/object-store/util/bson"
-            ],
-            publicHeadersPath: "realm/sync",
-            cxxSettings: [
-                .headerSearchPath("."),
-                .define("REALM_HAVE_SECURE_TRANSPORT", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-            ] + cxxSettings,
-            linkerSettings: [
-                .linkedFramework("Security", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-                .linkedLibrary("z")
-            ]),
-        /**
-        .target(
-            name: "ExternalCommitHelper",
-            dependencies: ["Storage"],
-            path: "src",
-            sources: [
-                "realm/object-store/impl/apple"
-            ],
-            publicHeadersPath: "realm/object-store/impl/apple",
-            cxxSettings: [
-                .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS]))
-            ] + cxxSettings
-        ),
-        .target(
-            name: "ExternalCommitHelperLinux",
-            dependencies: ["Storage"],
-            path: "src",
-            sources: [
-                "realm/object-store/impl/epoll"
-            ],
-            publicHeadersPath: "realm/object-store/impl/epoll",
-            cxxSettings: [
-                .define("REALM_HAVE_EPOLL", to: "1", .when(platforms: [.linux])),
-            ] + cxxSettings
-        ),*/
-        .target(
-            name: "RealmObjectStore",
-            dependencies: [
-                "RealmSyncClient",
-//                ._targetItem(name: "ExternalCommitHelper",
-//                             condition: .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
- //               ._targetItem(name: "ExternalCommitHelperLinux",
-  //                           condition: .when(platforms: [.linux])),
-            ],
-            path: "src",
-            exclude: objectStoreExcludes,
-            sources: ["realm/object-store"],
-            publicHeadersPath: "realm/object-store",
-            cxxSettings: ([
-                .headerSearchPath("."),
-                .define("REALM_ENABLE_SYNC", to: "1"),
-                .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-                .define("REALM_HAVE_EPOLL", to: "1", .when(platforms: [.linux])),
-                .define("REALM_HAVE_UV", to: "1", .when(platforms: [.linux])),
-//                .headerSearchPath("realm/object-store/**/*"),
-//                .headerSearchPath("realm/object-store/impl")
-            ] + cxxSettings) as [CXXSetting],
-            linkerSettings: [
-                .linkedFramework("Security", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-                .linkedLibrary("z")
-            ]),
+        bid,
+        realmCore,
         .target(
             name: "RealmCapi",
-            dependencies: ["RealmObjectStore", "RealmQueryParser"],
+            dependencies: ["RealmStorage"],
             path: "src",
             exclude: [
                 "realm/object-store/c_api/realm.c"
@@ -445,93 +218,7 @@ let package = Package(
             dependencies: ["PureCapi"],
             path: "src",
             sources: ["swift"]
-//            publicHeadersPath: "."
-        ),
-        /*.target(
-            name: "ObjectStoreTestUtils",
-            dependencies: ["ObjectStore"],
-            path: "test/object-store/util",
-            publicHeadersPath: ".",
-            cxxSettings: ([
-                .define("REALM_ENABLE_SYNC", to: "1"),
-                .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-                .headerSearchPath(".."),
-                .headerSearchPath("../../../external/catch/single_include"),
-            ] + cxxSettings) as [CXXSetting]),
-        */.target(
-            name: "SyncServer",
-            dependencies: [
-                "RealmSyncClient"
-            ],
-            path: "src",
-            exclude: syncCommandSources,
-            sources: syncServerSources,
-            publicHeadersPath: "realm/sync/impl", // hack
-            cxxSettings: cxxSettings + [
-                .headerSearchPath(".")
-            ],
-            linkerSettings: [
-                .linkedFramework("Foundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-            ]),
-//        .target(
-//            name: "SyncCommand",
-//            dependencies: [
-//                "RealmSyncClient"
-//            ],
-//            path: "src",
-//            exclude: syncServerSources,
-//            sources: syncCommandSources,
-//            publicHeadersPath: "realm/sync/impl", // hack
-//            cxxSettings: cxxSettings + [
-//                .headerSearchPath("realm/sync"),
-//                .headerSearchPath("realm/util")
-//            ],
-//            linkerSettings: [
-//                .linkedFramework("Foundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-//            ]),
-        .target(
-            name: "ObjectStoreTests",
-            dependencies: [
-              //"SyncClient",
-              "RealmObjectStore",
-              "RealmQueryParser",
-              "SyncServer",
-              //"ObjectStoreTestUtils"
-            ],
-            path: "test/object-store",
-            exclude: [
-                "benchmarks",
-                "notifications-fuzzer",
-                "c_api",
-                //"util"
-            ],
-            cxxSettings: ([
-                .define("REALM_ENABLE_SYNC", to: "1"),
-                .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-                .define("REALM_HAVE_UV", to: "1", .when(platforms: [.linux])),
-                .headerSearchPath("."),
-                .headerSearchPath("../../src"),
-                .headerSearchPath("../../external/catch/single_include"),
-                          ] + cxxSettings) as [CXXSetting],
-            linkerSettings: [
-              .linkedLibrary("pthread", .when(platforms: [.linux])),
-              .linkedLibrary("uv", .when(platforms: [.linux])),
-              .linkedLibrary("m", .when(platforms: [.linux])),
-              .linkedLibrary("crypto", .when(platforms: [.linux]))
-            ]
-        ),
-/*        .target(
-            name: "CapiTests",
-            dependencies: ["Capi",
-                           "ObjectStoreTestUtils",
-                           "SyncServer"],
-            path: "test/object-store/c_api",
-            cxxSettings: ([
-                .define("REALM_ENABLE_SYNC", to: "1"),
-                .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-                .headerSearchPath("../"),
-                .headerSearchPath("../../../external/catch/single_include")
-            ] + cxxSettings) as [CXXSetting])*/
+        )
     ],
     cxxLanguageStandard: .cxx1z
 )
