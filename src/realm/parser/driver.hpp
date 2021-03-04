@@ -269,7 +269,15 @@ public:
     std::string identifier;
     ExpressionComparisonType comp_type = ExpressionComparisonType::Any;
     PostOpNode* post_op = nullptr;
+    ConstantNode* index = nullptr;
 
+    PropNode(PathNode* node, std::string id, ConstantNode* idx, PostOpNode* po_node)
+        : path(node)
+        , identifier(id)
+        , post_op(po_node)
+        , index(idx)
+    {
+    }
     PropNode(PathNode* node, std::string id, PostOpNode* po_node,
              ExpressionComparisonType ct = ExpressionComparisonType::Any)
         : path(node)
@@ -408,7 +416,7 @@ public:
     std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> cmp(const std::vector<ValueNode*>& values);
     Subexpr* column(LinkChain&, std::string);
     void backlink(LinkChain&, const std::string&);
-    void translate(LinkChain&, std::string&);
+    std::string translate(LinkChain&, const std::string&);
 
 private:
     // The string being parsed.

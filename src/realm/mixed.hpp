@@ -168,6 +168,12 @@ public:
         return DataType(m_type - 1);
     }
 
+    template <class... Tail>
+    bool is_type(DataType head, Tail... tail) const noexcept
+    {
+        return _is_type(head, tail...);
+    }
+
     static bool types_are_comparable(const Mixed& l, const Mixed& r);
     static bool data_types_are_comparable(DataType l_type, DataType r_type);
 
@@ -192,6 +198,7 @@ public:
 
     bool is_null() const;
     bool is_unresolved_link() const;
+    bool is_same_type(const Mixed& b) const;
     int compare(const Mixed& b) const;
     bool operator==(const Mixed& other) const
     {
@@ -218,6 +225,7 @@ public:
         return compare(other) >= 0;
     }
     size_t hash() const;
+    void use_buffer(std::string& buf);
 
 protected:
     friend std::ostream& operator<<(std::ostream& out, const Mixed& m);
@@ -236,6 +244,21 @@ protected:
         ObjLink link_val;
         UUID uuid_val;
     };
+
+private:
+    static bool _is_type() noexcept
+    {
+        return false;
+    }
+    bool _is_type(DataType type) const noexcept
+    {
+        return m_type == unsigned(int(type) + 1);
+    }
+    template <class... Tail>
+    bool _is_type(DataType head, Tail... tail) const noexcept
+    {
+        return _is_type(head) || _is_type(tail...);
+    }
 };
 
 // Implementation:
@@ -254,14 +277,24 @@ inline Mixed::Mixed(bool v) noexcept
 
 inline Mixed::Mixed(float v) noexcept
 {
-    m_type = int(type_Float) + 1;
-    float_val = v;
+    if (null::is_null_float(v)) {
+        m_type = 0;
+    }
+    else {
+        m_type = int(type_Float) + 1;
+        float_val = v;
+    }
 }
 
 inline Mixed::Mixed(double v) noexcept
 {
-    m_type = int(type_Double) + 1;
-    double_val = v;
+    if (null::is_null_float(v)) {
+        m_type = 0;
+    }
+    else {
+        m_type = int(type_Double) + 1;
+        double_val = v;
+    }
 }
 
 inline Mixed::Mixed(util::Optional<int64_t> v) noexcept
@@ -288,7 +321,7 @@ inline Mixed::Mixed(util::Optional<bool> v) noexcept
 
 inline Mixed::Mixed(util::Optional<float> v) noexcept
 {
-    if (v) {
+    if (v && !null::is_null_float(*v)) {
         m_type = int(type_Float) + 1;
         float_val = *v;
     }
@@ -299,7 +332,7 @@ inline Mixed::Mixed(util::Optional<float> v) noexcept
 
 inline Mixed::Mixed(util::Optional<double> v) noexcept
 {
-    if (v) {
+    if (v && !null::is_null_float(*v)) {
         m_type = int(type_Double) + 1;
         double_val = *v;
     }
@@ -552,6 +585,8 @@ inline UUID Mixed::get_uuid() const
 template <>
 inline ObjKey Mixed::get<ObjKey>() const noexcept
 {
+    if (get_type() == type_TypedLink)
+        return link_val.get_obj_key();
     REALM_ASSERT(get_type() == type_Link);
     return ObjKey(int_val);
 }
@@ -577,6 +612,11 @@ inline ObjLink Mixed::get_link() const
 inline bool Mixed::is_null() const
 {
     return (m_type == 0);
+}
+
+inline bool Mixed::is_same_type(const Mixed& b) const
+{
+    return (m_type == b.m_type);
 }
 
 inline bool Mixed::is_unresolved_link() const

@@ -313,10 +313,10 @@ void Lst<Mixed>::do_set(size_t ndx, Mixed value)
     ObjLink target_link;
     Mixed old_value = get(ndx);
 
-    if (old_value.get_type() == type_TypedLink) {
+    if (old_value.is_type(type_TypedLink)) {
         old_link = old_value.get<ObjLink>();
     }
-    if (value.get_type() == type_TypedLink) {
+    if (value.is_type(type_TypedLink)) {
         target_link = value.get<ObjLink>();
     }
 
@@ -334,7 +334,7 @@ void Lst<Mixed>::do_set(size_t ndx, Mixed value)
 template <>
 void Lst<Mixed>::do_insert(size_t ndx, Mixed value)
 {
-    if (!value.is_null() && value.get_type() == type_TypedLink) {
+    if (value.is_type(type_TypedLink)) {
         m_obj.set_backlink(m_col_key, value.get<ObjLink>());
     }
     m_tree->insert(ndx, value);
@@ -343,7 +343,7 @@ void Lst<Mixed>::do_insert(size_t ndx, Mixed value)
 template <>
 void Lst<Mixed>::do_remove(size_t ndx)
 {
-    if (Mixed old_value = get(ndx); old_value.get_type() == type_TypedLink) {
+    if (Mixed old_value = get(ndx); old_value.is_type(type_TypedLink)) {
         auto old_link = old_value.get<ObjLink>();
 
         CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All
@@ -403,6 +403,7 @@ void LnkLst::remove_target_row(size_t link_ndx)
 void LnkLst::remove_all_target_rows()
 {
     if (is_attached()) {
+        update_if_needed();
         _impl::TableFriend::batch_erase_rows(*get_target_table(), *m_list.m_tree);
     }
 }

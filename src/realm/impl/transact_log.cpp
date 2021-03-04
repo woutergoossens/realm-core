@@ -78,7 +78,7 @@ void TransactLogConvenientEncoder::do_select_collection(const CollectionBase& li
 {
     select_table(list.get_table().unchecked_ptr());
     ColKey col_key = list.get_col_key();
-    ObjKey key = list.get_key();
+    ObjKey key = list.get_owner_key();
 
     m_encoder.select_collection(col_key, key); // Throws
     m_selected_list = CollectionId(list.get_table()->get_key(), key, col_key);
@@ -110,6 +110,20 @@ void TransactLogConvenientEncoder::dictionary_insert(const CollectionBase& dict,
 {
     select_collection(dict);
     m_encoder.dictionary_insert(ndx, key);
+}
+
+bool TransactLogEncoder::dictionary_set(size_t dict_ndx, Mixed key)
+{
+    REALM_ASSERT(key.get_type() == type_String);
+    append_string_instr(instr_DictionarySet, key.get_string()); // Throws
+    append_simple_instr(dict_ndx);
+    return true;
+}
+
+void TransactLogConvenientEncoder::dictionary_set(const CollectionBase& dict, size_t ndx, Mixed key, Mixed)
+{
+    select_collection(dict);
+    m_encoder.dictionary_set(ndx, key);
 }
 
 bool TransactLogEncoder::dictionary_erase(size_t ndx, Mixed key)

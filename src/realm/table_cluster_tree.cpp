@@ -217,7 +217,7 @@ void TableClusterTree::remove_all_links(CascadeState& state)
                             std::vector<ObjLink> links;
                             for (size_t j = 0; j < sz; j++) {
                                 auto mix = mix_arr.get(j);
-                                if (!mix.is_null() && mix.get_type() == type_TypedLink) {
+                                if (mix.is_type(type_TypedLink)) {
                                     links.push_back(mix.get<ObjLink>());
                                 }
                             }
@@ -243,11 +243,8 @@ void TableClusterTree::remove_all_links(CascadeState& state)
                             cluster->init_leaf(DictionaryClusterTree::s_values_col, &leaf);
                             for (size_t i = 0; i < e; i++) {
                                 auto mix = leaf.get(i);
-                                if (!mix.is_null()) {
-                                    // Links are always stored as TypedLinks
-                                    if (mix.get_type() == type_TypedLink) {
-                                        links.push_back(mix.get<ObjLink>());
-                                    }
+                                if (mix.is_type(type_TypedLink)) {
+                                    links.push_back(mix.get<ObjLink>());
                                 }
                             }
                             // Continue
@@ -289,7 +286,7 @@ void TableClusterTree::remove_all_links(CascadeState& state)
                     size_t sz = values.size();
                     for (size_t i = 0; i < sz; i++) {
                         Mixed mix = values.get(i);
-                        if (!mix.is_null() && mix.get_type() == type_TypedLink) {
+                        if (mix.is_type(type_TypedLink)) {
                             cluster->remove_backlinks(cluster->get_real_key(i), col_key,
                                                       std::vector<ObjLink>{mix.get<ObjLink>()}, state);
                         }
@@ -320,15 +317,6 @@ void TableClusterTree::remove_all_links(CascadeState& state)
 }
 
 /***********************  TableClusterTree::Iterator  ************************/
-
-auto TableClusterTree::Iterator::operator[](size_t n) -> reference
-{
-    auto k = go(n);
-    if (m_obj.get_key() != k) {
-        new (&m_obj) Obj(m_table, m_leaf.get_mem(), k, m_state.m_current_index);
-    }
-    return m_obj;
-}
 
 TableClusterTree::Iterator::pointer TableClusterTree::Iterator::operator->() const
 {

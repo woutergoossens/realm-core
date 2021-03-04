@@ -54,13 +54,16 @@ public:
     DataType get_key_data_type() const;
     DataType get_value_data_type() const;
 
+    std::pair<Mixed, Mixed> get_pair(size_t ndx) const;
+    Mixed get_key(size_t ndx) const;
+
     // Overriding members of CollectionBase:
-    std::unique_ptr<CollectionBase> clone_collection() const;
+    std::unique_ptr<CollectionBase> clone_collection() const final;
     size_t size() const final;
     bool is_null(size_t ndx) const final;
     Mixed get_any(size_t ndx) const final;
-    std::pair<Mixed, Mixed> get_pair(size_t ndx);
     size_t find_any(Mixed value) const final;
+    size_t find_any_key(Mixed value) const;
 
     Mixed min(size_t* return_ndx = nullptr) const final;
     Mixed max(size_t* return_ndx = nullptr) const final;
@@ -77,12 +80,24 @@ public:
     std::pair<Iterator, bool> insert(Mixed key, Mixed value);
     std::pair<Iterator, bool> insert(Mixed key, const Obj& obj);
 
+    Obj create_and_insert_linked_object(Mixed key);
+
     // throws std::out_of_range if key is not found
     Mixed get(Mixed key) const;
     // Noexcept version
     util::Optional<Mixed> try_get(Mixed key) const noexcept;
     // adds entry if key is not found
     const Mixed operator[](Mixed key);
+
+    Obj get_object(StringData key)
+    {
+        auto val = try_get(key);
+        Obj obj;
+        if (val && (*val).is_type(type_Link)) {
+            return get_target_table()->get_object((*val).get<ObjKey>());
+        }
+        return obj;
+    }
 
     bool contains(Mixed key);
     Iterator find(Mixed key);
@@ -91,6 +106,7 @@ public:
     void erase(Iterator it);
 
     void nullify(Mixed);
+    void remove_backlinks(CascadeState& state) const;
 
     void clear() final;
 
@@ -144,7 +160,9 @@ private:
 
     bool init_from_parent() const final;
     Mixed do_get(const ClusterNode::State&) const;
+    Mixed do_get_key(const ClusterNode::State&) const;
     std::pair<Mixed, Mixed> do_get_pair(const ClusterNode::State&) const;
+    bool clear_backlink(Mixed value, CascadeState& state) const;
 
     friend struct CollectionIterator<Dictionary>;
 };

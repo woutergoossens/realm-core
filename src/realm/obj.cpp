@@ -100,69 +100,6 @@ Replication* Obj::get_replication() const
     return m_table->get_repl();
 }
 
-template <class T>
-inline int Obj::cmp(const Obj& other, ColKey::Idx col_ndx) const
-{
-    T val1 = _get<T>(col_ndx);
-    T val2 = other._get<T>(col_ndx);
-    if (val1 < val2) {
-        return -1;
-    }
-    else if (val1 > val2) {
-        return 1;
-    }
-    return 0;
-}
-
-int Obj::cmp(const Obj& other, ColKey col_key) const
-{
-    other.check_valid();
-    ColKey::Idx col_ndx = col_key.get_index();
-    ColumnAttrMask attr = col_key.get_attrs();
-    REALM_ASSERT(!attr.test(col_attr_List)); // TODO: implement comparison of lists
-
-    switch (DataType(col_key.get_type())) {
-        case type_Int:
-            if (attr.test(col_attr_Nullable))
-                return cmp<util::Optional<Int>>(other, col_ndx);
-            else
-                return cmp<Int>(other, col_ndx);
-        case type_Bool:
-            return cmp<Bool>(other, col_ndx);
-        case type_Float:
-            return cmp<Float>(other, col_ndx);
-        case type_Double:
-            return cmp<Double>(other, col_ndx);
-        case type_String:
-            return cmp<String>(other, col_ndx);
-        case type_Binary:
-            return cmp<Binary>(other, col_ndx);
-        case type_Mixed:
-            return cmp<Mixed>(other, col_ndx);
-        case type_Timestamp:
-            return cmp<Timestamp>(other, col_ndx);
-        case type_Decimal:
-            return cmp<Decimal128>(other, col_ndx);
-        case type_ObjectId:
-            if (attr.test(col_attr_Nullable))
-                return cmp<util::Optional<ObjectId>>(other, col_ndx);
-            else
-                return cmp<ObjectId>(other, col_ndx);
-        case type_UUID:
-            if (attr.test(col_attr_Nullable))
-                return cmp<util::Optional<UUID>>(other, col_ndx);
-            else
-                return cmp<UUID>(other, col_ndx);
-        case type_Link:
-            return cmp<ObjKey>(other, col_ndx);
-        case type_TypedLink:
-            return cmp<ObjLink>(other, col_ndx);
-        case type_LinkList:
-            REALM_ASSERT(false);
-            break;
-    }
-    return 0;
-}
 
 bool Obj::operator==(const Obj& other) const
 {
@@ -455,18 +392,16 @@ Mixed Obj::get_any(std::vector<std::string>::iterator path_start, std::vector<st
         ++path_start;
         if (path_start == path_end)
             return val;
-        if (!val.is_null()) {
-            if (val.get_type() == type_Link || val.get_type() == type_TypedLink) {
-                Obj obj;
-                if (val.get_type() == type_Link) {
-                    obj = get_target_table(col)->get_object(val.get<ObjKey>());
-                }
-                else {
-                    auto obj_link = val.get<ObjLink>();
-                    obj = get_target_table(obj_link)->get_object(obj_link.get_obj_key());
-                }
-                return obj.get_any(path_start, path_end);
+        if (val.is_type(type_Link, type_TypedLink)) {
+            Obj obj;
+            if (val.get_type() == type_Link) {
+                obj = get_target_table(col)->get_object(val.get<ObjKey>());
             }
+            else {
+                auto obj_link = val.get<ObjLink>();
+                obj = get_target_table(obj_link)->get_object(obj_link.get_obj_key());
+            }
+            return obj.get_any(path_start, path_end);
         }
     }
     return {};
@@ -475,12 +410,95 @@ Mixed Obj::get_any(std::vector<std::string>::iterator path_start, std::vector<st
 Mixed Obj::get_primary_key() const
 {
     auto col = m_table->get_primary_key_column();
-    if (col) {
-        return get_any(col);
+    return col ? get_any(col) : Mixed{get_key()};
+}
+
+template <class T>
+inline int Obj::cmp(const Obj& other, ColKey::Idx col_ndx) const
+{
+    T val1 = _get<T>(col_ndx);
+    T val2 = other._get<T>(col_ndx);
+
+    if (val1 < val2) {
+        return -1;
     }
-    else {
-        return Mixed{get_key()};
+
+    if (val1 > val2) {
+        return 1;
     }
+
+    return 0;
+}
+
+template <>
+inline int Obj::cmp<StringData>(const Obj& other, ColKey::Idx col_ndx) const
+{
+    StringData a = _get<StringData>(col_ndx);
+    StringData b = other._get<StringData>(col_ndx);
+
+    if (a.is_null()) {
+        return b.is_null() ? 0 : -1;
+    }
+
+    if (b.is_null()) {
+        return 1;
+    }
+
+    if (a == b) {
+        return 0;
+    }
+
+    return utf8_compare(a, b) ? -1 : 1;
+}
+
+int Obj::cmp(const Obj& other, ColKey col_key) const
+{
+    other.check_valid();
+    ColKey::Idx col_ndx = col_key.get_index();
+    ColumnAttrMask attr = col_key.get_attrs();
+    REALM_ASSERT(!attr.test(col_attr_List)); // TODO: implement comparison of lists
+
+    switch (DataType(col_key.get_type())) {
+        case type_Int:
+            if (attr.test(col_attr_Nullable))
+                return cmp<util::Optional<Int>>(other, col_ndx);
+            else
+                return cmp<Int>(other, col_ndx);
+        case type_Bool:
+            return cmp<Bool>(other, col_ndx);
+        case type_Float:
+            return cmp<Float>(other, col_ndx);
+        case type_Double:
+            return cmp<Double>(other, col_ndx);
+        case type_String:
+            return cmp<String>(other, col_ndx);
+        case type_Binary:
+            return cmp<Binary>(other, col_ndx);
+        case type_Mixed:
+            return cmp<Mixed>(other, col_ndx);
+        case type_Timestamp:
+            return cmp<Timestamp>(other, col_ndx);
+        case type_Decimal:
+            return cmp<Decimal128>(other, col_ndx);
+        case type_ObjectId:
+            if (attr.test(col_attr_Nullable))
+                return cmp<util::Optional<ObjectId>>(other, col_ndx);
+            else
+                return cmp<ObjectId>(other, col_ndx);
+        case type_UUID:
+            if (attr.test(col_attr_Nullable))
+                return cmp<util::Optional<UUID>>(other, col_ndx);
+            else
+                return cmp<UUID>(other, col_ndx);
+        case type_Link:
+            return cmp<ObjKey>(other, col_ndx);
+        case type_TypedLink:
+            return cmp<ObjLink>(other, col_ndx);
+        case type_LinkList:
+            REALM_ASSERT(false);
+            break;
+    }
+    return 0;
 }
 
 /* FIXME: Make this one fast too!
@@ -689,13 +707,23 @@ void Obj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const
                 TableRef tr = m_table->get_opposite_table(col_key);
                 Obj obj = tr->get_object(backlinks[0]); // always the first (and only)
                 auto next_col_key = m_table->get_opposite_column(col_key);
-                size_t index = 0;
+                Mixed index;
                 if (next_col_key.get_attrs().test(col_attr_List)) {
                     auto ll = obj.get_linklist(next_col_key);
-                    while (ll.get(index) != get_key()) {
-                        index++;
-                        REALM_ASSERT(ll.size() > index);
+                    auto i = ll.find_first(get_key());
+                    REALM_ASSERT(i != realm::npos);
+                    index = Mixed(int64_t(i));
+                }
+                else if (next_col_key.get_attrs().test(col_attr_Dictionary)) {
+                    ObjLink link = get_link();
+                    auto dict = obj.get_dictionary(next_col_key);
+                    for (auto it : dict) {
+                        if (it.second.is_type(type_TypedLink) && it.second.get_link() == link) {
+                            index = it.first;
+                            break;
+                        }
                     }
+                    REALM_ASSERT(!index.is_null());
                 }
                 obj.traverse_path(v, ps, path_length + 1);
                 v(obj, next_col_key, index);
@@ -715,7 +743,7 @@ Obj::FatPath Obj::get_fat_path() const
     auto sizer = [&](size_t size) {
         result.reserve(size);
     };
-    auto step = [&](const Obj& o2, ColKey col, size_t idx) -> void {
+    auto step = [&](const Obj& o2, ColKey col, Mixed idx) -> void {
         result.push_back({o2, col, idx});
     };
     traverse_path(step, sizer);
@@ -729,7 +757,7 @@ Obj::Path Obj::get_path() const
     auto sizer = [&](size_t size) {
         result.path_from_top.reserve(size);
     };
-    auto step = [&](const Obj& o2, ColKey col, size_t idx) -> void {
+    auto step = [&](const Obj& o2, ColKey col, Mixed idx) -> void {
         if (!top_done) {
             top_done = true;
             result.top_table = o2.get_table()->get_key();
@@ -1208,7 +1236,7 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
         ObjLink new_link = value.template get<ObjLink>();
         Mixed old_value = get<Mixed>(col_key);
         ObjLink old_link;
-        if (!old_value.is_null() && old_value.get_type() == type_TypedLink) {
+        if (old_value.is_type(type_TypedLink)) {
             old_link = old_value.get<ObjLink>();
             if (new_link == old_link)
                 return *this;

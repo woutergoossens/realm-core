@@ -85,8 +85,8 @@ set(CORE_TEST_SOURCES
     test_util_to_string.cpp
     test_util_type_list.cpp
     test_util_fixed_size_buffer.cpp
-    test_uuid.cpp
-    test_version.cpp)
+	test_uuid.cpp
+    test_mixed_null_assertions.cpp)
 
 if (REALM_ENABLE_ENCRYPTION)
 	list(APPEND CORE_TEST_SOURCES test_encrypted_file_mapping.cpp)
@@ -131,6 +131,10 @@ file(GLOB REQUIRED_TEST_FILES
 
 add_executable(CoreTests ${CORE_TESTS} ${MAIN_FILE} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})
 set_target_properties(CoreTests PROPERTIES OUTPUT_NAME "realm-tests")
+
+if (REALM_TEST_DURATION)
+    add_compile_definitions(TEST_DURATION=${REALM_TEST_DURATION})
+endif()
 
 # Resources required for running the tests copied to the target directory
 if(CMAKE_GENERATOR STREQUAL Xcode)

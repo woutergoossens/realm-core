@@ -382,23 +382,30 @@ public:
         m_size++;
     }
 
-    T get(size_t n) const
+    inline T get(size_t n) const
     {
+        // Fast path
         if (m_cached_leaf_begin <= n && n < m_cached_leaf_end) {
             return m_leaf_cache.get(n - m_cached_leaf_begin);
         }
         else {
-            T value;
-
-            auto func = [&value](BPlusTreeNode* node, size_t ndx) {
-                LeafNode* leaf = static_cast<LeafNode*>(node);
-                value = leaf->get(ndx);
-            };
-
-            m_root->bptree_access(n, func);
-
-            return value;
+            // Slow path
+            return get_uncached(n);
         }
+    }
+
+    REALM_NOINLINE T get_uncached(size_t n) const
+    {
+        T value;
+
+        auto func = [&value](BPlusTreeNode* node, size_t ndx) {
+            LeafNode* leaf = static_cast<LeafNode*>(node);
+            value = leaf->get(ndx);
+        };
+
+        m_root->bptree_access(n, func);
+
+        return value;
     }
 
     std::vector<T> get_all() const
@@ -450,6 +457,20 @@ public:
             SwapBuffer tmp2{get(ndx2)};
             set(ndx1, tmp2.get());
             set(ndx2, tmp1.get());
+        }
+        else if constexpr (std::is_same_v<T, Mixed>) {
+            std::string buf1;
+            std::string buf2;
+            Mixed tmp1 = get(ndx1);
+            Mixed tmp2 = get(ndx2);
+            if (tmp1.is_type(type_String, type_Binary)) {
+                tmp1.use_buffer(buf1);
+            }
+            if (tmp2.is_type(type_String, type_Binary)) {
+                tmp2.use_buffer(buf2);
+            }
+            set(ndx1, tmp2);
+            set(ndx2, tmp1);
         }
         else {
             T tmp = get(ndx1);
@@ -737,6 +758,6 @@ ColumnAverageType<T> bptree_average(const BPlusTree<T>& tree, size_t* return_cnt
         *return_cnt = cnt;
     return avg;
 }
-}
+} // namespace realm
 
 #endif /* REALM_BPLUSTREE_HPP */

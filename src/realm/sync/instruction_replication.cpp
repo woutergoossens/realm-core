@@ -125,7 +125,11 @@ Instruction::Payload SyncReplication::as_payload(const Table& table, ColKey col_
         REALM_ASSERT(target_table);
 
         if (target_table->is_embedded()) {
-            REALM_TERMINATE("Dynamically typed embedded objects not supported yet.");
+            ConstTableRef static_target_table = table.get_link_target(col_key);
+
+            if (static_target_table != target_table)
+                REALM_TERMINATE("Dynamically typed embedded objects not supported yet.");
+            return Instruction::Payload::ObjectValue{};
         }
 
         Instruction::Payload::Link link;
@@ -603,10 +607,8 @@ void SyncReplication::set_clear(const CollectionBase& set)
     }
 }
 
-void SyncReplication::dictionary_insert(const CollectionBase& dict, size_t ndx, Mixed key, Mixed value)
+void SyncReplication::dictionary_update(const CollectionBase& dict, const Mixed& key, const Mixed& value)
 {
-    TrivialReplication::dictionary_insert(dict, ndx, key, value);
-
     if (!value.is_null()) {
         // If link is unresolved, it should not be communicated.
         if (value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
@@ -627,6 +629,18 @@ void SyncReplication::dictionary_insert(const CollectionBase& dict, size_t ndx, 
         instr.is_default = false;
         emit(instr);
     }
+}
+
+void SyncReplication::dictionary_insert(const CollectionBase& dict, size_t ndx, Mixed key, Mixed value)
+{
+    TrivialReplication::dictionary_insert(dict, ndx, key, value);
+    dictionary_update(dict, key, value);
+}
+
+void SyncReplication::dictionary_set(const CollectionBase& dict, size_t ndx, Mixed key, Mixed value)
+{
+    TrivialReplication::dictionary_set(dict, ndx, key, value);
+    dictionary_update(dict, key, value);
 }
 
 void SyncReplication::dictionary_erase(const CollectionBase& dict, size_t ndx, Mixed key)
@@ -701,7 +715,7 @@ bool SyncReplication::select_table(const Table& table)
 
 bool SyncReplication::select_collection(const CollectionBase& view)
 {
-    if (view.get_key().is_unresolved()) {
+    if (view.get_owner_key().is_unresolved()) {
         return false;
     }
 
@@ -765,7 +779,7 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
             instr.path.m_path.reserve(size * 2);
         };
 
-        auto visitor = [&](const Obj& path_obj, ColKey next_field, size_t index) {
+        auto visitor = [&](const Obj& path_obj, ColKey next_field, Mixed index) {
             auto element_table = path_obj.get_table();
             if (element_table->is_embedded()) {
                 StringData field_name = element_table->get_column_name(next_field);
@@ -778,7 +792,11 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
             }
 
             if (next_field.is_list()) {
-                instr.path.push_back(uint32_t(index));
+                instr.path.push_back(uint32_t(index.get_int()));
+            }
+            else if (next_field.is_dictionary()) {
+                InternString interned_field_name = m_encoder.intern_string(index.get_string());
+                instr.path.push_back(interned_field_name);
             }
         };
 
@@ -818,7 +836,7 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
 void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, const CollectionBase& list)
 {
     ConstTableRef source_table = list.get_table();
-    ObjKey source_obj = list.get_key();
+    ObjKey source_obj = list.get_owner_key();
     ColKey source_field = list.get_col_key();
     populate_path_instr(instr, *source_table, source_obj, source_field);
 }

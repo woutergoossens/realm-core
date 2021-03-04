@@ -57,7 +57,7 @@ public:
         _impl::CollectionChangeBuilder c;
         _impl::TransactionChangeInfo info{};
         info.tables[m_table_key.value];
-        info.lists.push_back({m_table_key, m_list.get_key().value, m_list.get_col_key().value, &c});
+        info.lists.push_back({m_table_key, m_list.get_owner_key().value, m_list.get_col_key().value, &c});
         _impl::transaction::advance(*m_group, info);
 
         if (info.lists.empty()) {
@@ -227,7 +227,7 @@ private:
 TEST_CASE("Transaction log parsing: schema change validation") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
-    config.schema_mode = SchemaMode::Additive;
+    config.schema_mode = SchemaMode::AdditiveExplicit;
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
         {"table",

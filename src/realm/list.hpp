@@ -263,7 +263,7 @@ public:
     }
 
     // Overriding members of CollectionBase:
-    using CollectionBase::get_key;
+    using CollectionBase::get_owner_key;
     size_t size() const final;
     bool is_null(size_t ndx) const final;
     Mixed get_any(size_t ndx) const final;
@@ -854,7 +854,8 @@ inline bool LnkLst::is_null(size_t ndx) const
 inline Mixed LnkLst::get_any(size_t ndx) const
 {
     update_if_needed();
-    return m_list.get_any(virtual2real(ndx));
+    auto obj_key = m_list.get(virtual2real(ndx));
+    return ObjLink{get_target_table()->get_key(), obj_key};
 }
 
 inline void LnkLst::clear()

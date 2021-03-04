@@ -49,13 +49,10 @@ public:
     // the tableview as needed
     Results();
     Results(std::shared_ptr<Realm> r, ConstTableRef table);
-    Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> list);
-    Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> list, DescriptorOrdering o);
     Results(std::shared_ptr<Realm> r, Query q, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o = {});
-    Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> list, util::Optional<Query> q = {},
-            SortDescriptor s = {});
-    Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkSet> list, util::Optional<Query> q = {},
+    Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> list, DescriptorOrdering o);
+    Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> collection, util::Optional<Query> q = {},
             SortDescriptor s = {});
     ~Results();
 
@@ -74,10 +71,12 @@ public:
     // Object schema describing the vendored object type
     const ObjectSchema& get_object_schema() const REQUIRES(!m_mutex);
 
+    // Get the table of the vendored object type
+    ConstTableRef get_table() const REQUIRES(!m_mutex);
+
     // Get a query which will match the same rows as is contained in this Results
     // Returned query will not be valid if the current mode is Empty
     Query get_query() const REQUIRES(!m_mutex);
-    ConstTableRef get_table() const REQUIRES(!m_mutex);
 
     // Get the Collection this Results is derived from, if any
     const std::shared_ptr<CollectionBase>& get_collection() const
@@ -111,7 +110,7 @@ public:
     // Get an element in a list
     Mixed get_any(size_t index) REQUIRES(!m_mutex);
 
-    std::pair<StringData, Mixed> get_dictionary_element(size_t index);
+    std::pair<StringData, Mixed> get_dictionary_element(size_t index) REQUIRES(!m_mutex);
 
     // Get the boxed row accessor for the given index
     // Throws OutOfBoundsIndexException if index >= size()
@@ -194,10 +193,8 @@ public:
     enum class Mode {
         Empty,      // Backed by nothing (for missing tables)
         Table,      // Backed directly by a Table
-        Collection, // Backed by a list-of-primitives, set-of-primitives or dictionary
+        Collection, // Backed by a collection of links or primitives
         Query,      // Backed by a query that has not yet been turned into a TableView
-        LinkList,   // Backed directly by a LinkList
-        LinkSet,    // Backed directly by a LnkSet
         TableView,  // Backed by a TableView created from a Query
     };
     // Get the currrent mode of the Results
@@ -305,8 +302,6 @@ private:
     TableView m_table_view GUARDED_BY(m_mutex);
     ConstTableRef m_table;
     DescriptorOrdering m_descriptor_ordering;
-    std::shared_ptr<LnkLst> m_link_list;
-    std::shared_ptr<LnkSet> m_link_set;
     std::shared_ptr<CollectionBase> m_collection;
     util::Optional<std::vector<size_t>> m_list_indices GUARDED_BY(m_mutex);
 
@@ -314,8 +309,6 @@ private:
 
     Mode m_mode GUARDED_BY(m_mutex) = Mode::Empty;
     UpdatePolicy m_update_policy = UpdatePolicy::Auto;
-
-    bool update_link_collection() REQUIRES(m_mutex);
 
     void validate_read() const;
     void validate_write() const;

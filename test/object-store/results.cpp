@@ -2951,6 +2951,68 @@ TEMPLATE_TEST_CASE("results: get<Obj>()", "", ResultsFromTable, ResultsFromQuery
     }
 }
 
+TEMPLATE_TEST_CASE("results: get<Obj>() intermixed with writes", "", ResultsFromTable, ResultsFromQuery,
+                   ResultsFromTableView)
+{
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"object",
+         {
+             {"pk", PropertyType::Int, Property::IsPrimary{true}},
+         }},
+    });
+
+    auto table = r->read_group().get_table("class_object");
+    ColKey col_value = table->get_column_key("pk");
+    Results results = TestType::call(r, table);
+
+    r->begin_transaction();
+
+    SECTION("front insertion") {
+        for (int i = 0; i < 1000; ++i) {
+            table->create_object_with_primary_key(1000 - i);
+            REQUIRE(results.get<Obj>(0).get<int64_t>(col_value) == 1000 - i);
+        }
+    }
+
+    SECTION("append at end") {
+        for (int i = 0; i < 1000; ++i) {
+            table->create_object_with_primary_key(i);
+            REQUIRE(results.get<Obj>(i).get<int64_t>(col_value) == i);
+        }
+    }
+
+    SECTION("random order") {
+        int indexes[1000];
+        std::iota(std::begin(indexes), std::end(indexes), 0);
+        std::random_device rd;
+        std::mt19937 g(rd());
+        std::shuffle(std::begin(indexes), std::end(indexes), std::mt19937(rd()));
+
+        for (auto i : indexes) {
+            auto index = table->get_object_ndx(table->create_object_with_primary_key(i).get_key());
+            REQUIRE(results.get<Obj>(index).get<int64_t>(col_value) == i);
+        }
+    }
+
+    SECTION("delete from front") {
+        for (int i = 0; i < 1000; ++i)
+            table->create_object_with_primary_key(i);
+        while (table->size())
+            results.get<Obj>(0).remove();
+    }
+
+    SECTION("delete from back") {
+        for (int i = 0; i < 1000; ++i)
+            table->create_object_with_primary_key(i);
+        while (table->size())
+            results.get<Obj>(table->size() - 1).remove();
+    }
+}
+
 TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsFromQuery, ResultsFromTableView,
                    ResultsFromLinkView, ResultsFromLinkSet)
 {
@@ -3033,6 +3095,77 @@ TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsF
             CHECK_THROWS_WITH(results.index_of(ctx, util::Any(detached_obj)),
                               "Attempting to access an invalid object");
         }
+    }
+}
+
+TEST_CASE("results: list of primitives indexes") {
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"object", {{"list", PropertyType::Int | PropertyType::Array | PropertyType::Nullable}}},
+    });
+
+    constexpr size_t num_items = 10;
+    r->begin_transaction();
+    auto table = r->read_group().get_table("class_object");
+    auto obj = table->create_object();
+    auto list = obj.get_list<util::Optional<Int>>(table->get_column_key("list"));
+    for (size_t i = 0; i < num_items; ++i)
+        list.add(i);
+    r->commit_transaction();
+
+    Results results(r, obj.get_collection_ptr(table->get_column_key("list")));
+
+    SECTION("index_of() Mixed of correct type") {
+        for (size_t i = 0; i < num_items; ++i)
+            REQUIRE(results.index_of(Mixed(int64_t(i))) == i);
+    }
+    SECTION("index_of(null)") {
+        REQUIRE(results.index_of(Mixed{}) == realm::not_found);
+    }
+    SECTION("index_of() with type checking") {
+        SECTION("double does not match") {
+            for (size_t i = 0; i < num_items; ++i)
+                REQUIRE(results.index_of(Mixed(double(i))) == realm::not_found);
+        }
+    }
+}
+
+TEST_CASE("results: dictionary keys") {
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"object", {{"dictionary", PropertyType::Int | PropertyType::Dictionary | PropertyType::Nullable}}},
+    });
+
+    constexpr size_t num_items = 10;
+    r->begin_transaction();
+    auto table = r->read_group().get_table("class_object");
+    auto obj = table->create_object();
+    auto dict_col_key = table->get_column_key("dictionary");
+    object_store::Dictionary dict(r, obj, dict_col_key);
+    for (size_t i = 0; i < num_items; ++i)
+        dict.insert(util::format("item_%1", i), int64_t(i));
+    r->commit_transaction();
+
+    Results results = dict.get_keys();
+
+    SECTION("index_of() Mixed of correct type") {
+        for (size_t i = 0; i < num_items; ++i) {
+            // nb: these are not in insertion order!
+            Mixed key_i = results.get<StringData>(i);
+            REQUIRE(results.index_of(key_i) == i);
+        }
+    }
+    SECTION("index_of() non existant key") {
+        REQUIRE(results.index_of(Mixed("foo")) == realm::npos);
+    }
+    SECTION("index_of() wrong key type") {
+        REQUIRE(results.index_of(Mixed(int64_t(0))) == realm::npos);
     }
 }
 

@@ -29,7 +29,7 @@ namespace realm {
 namespace {
 void validate_key_value(const Mixed& key)
 {
-    if (key.get_type() == type_String) {
+    if (key.is_type(type_String)) {
         const char* str = key.get_string().data();
         if (str[0] == '$')
             throw std::runtime_error("Dictionary::insert: key must not start with '$'");
@@ -259,7 +259,7 @@ Mixed Dictionary::get_any(size_t ndx) const
     return do_get(m_clusters->get(ndx, k));
 }
 
-std::pair<Mixed, Mixed> Dictionary::get_pair(size_t ndx)
+std::pair<Mixed, Mixed> Dictionary::get_pair(size_t ndx) const
 {
     update_if_needed();
     if (ndx >= size()) {
@@ -269,10 +269,20 @@ std::pair<Mixed, Mixed> Dictionary::get_pair(size_t ndx)
     return do_get_pair(m_clusters->get(ndx, k));
 }
 
+Mixed Dictionary::get_key(size_t ndx) const
+{
+    update_if_needed();
+    if (ndx >= size()) {
+        throw std::out_of_range("ndx out of range");
+    }
+    ObjKey k;
+    return do_get_key(m_clusters->get(ndx, k));
+}
+
 size_t Dictionary::find_any(Mixed value) const
 {
     size_t ret = realm::not_found;
-    if (is_attached()) {
+    if (size()) {
         update_if_needed();
         ArrayMixed leaf(m_obj.get_alloc());
         size_t start_ndx = 0;
@@ -292,6 +302,23 @@ size_t Dictionary::find_any(Mixed value) const
         });
     }
 
+    return ret;
+}
+
+size_t Dictionary::find_any_key(Mixed key) const
+{
+    size_t ret = realm::not_found;
+    if (size()) {
+        update_if_needed();
+        try {
+            auto hash = key.hash();
+            ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
+            ret = m_clusters->get_ndx(k);
+        }
+        catch (...) {
+            // ignored
+        }
+    }
     return ret;
 }
 
@@ -369,10 +396,17 @@ void Dictionary::sort(std::vector<size_t>& indices, bool ascending) const
 }
 void Dictionary::distinct(std::vector<size_t>&, util::Optional<bool>) const {}
 
+Obj Dictionary::create_and_insert_linked_object(Mixed key)
+{
+    Table& t = *get_target_table();
+    auto o = t.is_embedded() ? t.create_linked_object() : t.create_object();
+    insert(key, o.get_key());
+    return o;
+}
+
 Mixed Dictionary::get(Mixed key) const
 {
-    update_if_needed();
-    if (m_clusters) {
+    if (size()) {
         auto hash = key.hash();
         ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
         return do_get(m_clusters->get(k));
@@ -383,8 +417,7 @@ Mixed Dictionary::get(Mixed key) const
 
 util::Optional<Mixed> Dictionary::try_get(Mixed key) const noexcept
 {
-    update_if_needed();
-    if (m_clusters) {
+    if (size()) {
         auto hash = key.hash();
         ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
         auto state = m_clusters->try_get(k);
@@ -440,21 +473,19 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
     update_if_needed();
 
     ObjLink new_link;
-    if (!value.is_null()) {
-        if (value.get_type() == type_TypedLink) {
-            new_link = value.get<ObjLink>();
-            m_obj.get_table()->get_parent_group()->validate(new_link);
+    if (value.is_type(type_TypedLink)) {
+        new_link = value.get<ObjLink>();
+        m_obj.get_table()->get_parent_group()->validate(new_link);
+    }
+    else if (value.is_type(type_Link)) {
+        auto target_table = m_obj.get_table()->get_opposite_table(m_col_key);
+        auto key = value.get<ObjKey>();
+        if (!target_table->is_valid(key)) {
+            throw LogicError(LogicError::target_row_index_out_of_range);
         }
-        else if (value.get_type() == type_Link) {
-            auto target_table = m_obj.get_table()->get_opposite_table(m_col_key);
-            auto key = value.get<ObjKey>();
-            if (!target_table->is_valid(key)) {
-                throw LogicError(LogicError::target_row_index_out_of_range);
-            }
 
-            new_link = ObjLink(target_table->get_key(), key);
-            value = Mixed(new_link);
-        }
+        new_link = ObjLink(target_table->get_key(), key);
+        value = Mixed(new_link);
     }
 
     create();
@@ -473,7 +504,12 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
     }
 
     if (Replication* repl = this->m_obj.get_replication()) {
-        repl->dictionary_insert(*this, state.index, key, value);
+        if (old_entry) {
+            repl->dictionary_set(*this, state.index, key, value);
+        }
+        else {
+            repl->dictionary_insert(*this, state.index, key, value);
+        }
     }
 
     bump_content_version();
@@ -488,15 +524,17 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
         values.init_from_parent();
 
         Mixed old_value = values.get(state.index);
-        if (!old_value.is_null() && old_value.get_type() == type_TypedLink) {
+        if (old_value.is_type(type_TypedLink)) {
             old_link = old_value.get<ObjLink>();
         }
         values.set(state.index, value);
     }
 
     if (new_link != old_link) {
-        CascadeState cascade_state;
-        m_obj.replace_backlink(m_col_key, old_link, new_link, cascade_state);
+        CascadeState cascade_state(CascadeState::Mode::Strong);
+        bool recurse = m_obj.replace_backlink(m_col_key, old_link, new_link, cascade_state);
+        if (recurse)
+            _impl::TableFriend::remove_recursive(*m_obj.get_table(), cascade_state); // Throws
     }
 
     return {Iterator(this, state.index), !old_entry};
@@ -522,8 +560,7 @@ const Mixed Dictionary::operator[](Mixed key)
 
 bool Dictionary::contains(Mixed key)
 {
-    update_if_needed();
-    if (m_clusters) {
+    if (size()) {
         auto hash = key.hash();
         ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
         auto state = m_clusters->try_get(k);
@@ -535,7 +572,7 @@ bool Dictionary::contains(Mixed key)
 
 Dictionary::Iterator Dictionary::find(Mixed key)
 {
-    if (m_clusters) {
+    if (size()) {
         auto hash = key.hash();
         ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
         try {
@@ -550,12 +587,21 @@ Dictionary::Iterator Dictionary::find(Mixed key)
 void Dictionary::erase(Mixed key)
 {
     validate_key_value(key);
-    update_if_needed();
 
-    if (m_clusters) {
+    if (size()) {
         auto hash = key.hash();
         ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
         auto state = m_clusters->get(k);
+
+        ArrayMixed values(m_obj.get_alloc());
+        ref_type ref = to_ref(Array::get(state.mem.get_addr(), 2));
+        values.init_from_ref(ref);
+        auto old_value = values.get(state.index);
+
+        CascadeState cascade_state(CascadeState::Mode::Strong);
+        bool recurse = clear_backlink(old_value, cascade_state);
+        if (recurse)
+            _impl::TableFriend::remove_recursive(*m_obj.get_table(), cascade_state); // Throws
 
         if (Replication* repl = this->m_obj.get_replication()) {
             repl->dictionary_erase(*this, state.index, key);
@@ -575,33 +621,51 @@ void Dictionary::nullify(Mixed key)
 {
     auto hash = key.hash();
     ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
-
-    bump_content_version();
-
     auto state = m_clusters->get(k);
+
+    if (Replication* repl = this->m_obj.get_replication()) {
+        repl->dictionary_set(*this, state.index, key, Mixed());
+    }
+
     ArrayMixed values(m_obj.get_alloc());
     ref_type ref = to_ref(Array::get(state.mem.get_addr(), 2));
     values.init_from_ref(ref);
     values.set(state.index, Mixed());
 }
 
+void Dictionary::remove_backlinks(CascadeState& state) const
+{
+    for (auto&& elem : *this) {
+        clear_backlink(elem.second, state);
+    }
+}
+
+
 void Dictionary::clear()
 {
     if (size() > 0) {
         // TODO: Should we have a "dictionary_clear" instruction?
-        if (Replication* repl = this->m_obj.get_replication()) {
-            size_t n = 0;
-            for (auto&& elem : *this) {
+        Replication* repl = m_obj.get_replication();
+        size_t n = 0;
+        bool recurse = false;
+        CascadeState cascade_state(CascadeState::Mode::Strong);
+        for (auto&& elem : *this) {
+            if (clear_backlink(elem.second, cascade_state))
+                recurse = true;
+            if (repl)
                 repl->dictionary_erase(*this, n, elem.first);
-                n++;
-            }
+            n++;
         }
+
         // Just destroy the whole cluster
         m_clusters->destroy();
         delete m_clusters;
         m_clusters = nullptr;
 
         update_child_ref(0, 0);
+
+        if (recurse)
+            _impl::TableFriend::remove_recursive(*m_obj.get_table(), cascade_state); // Throws
     }
 }
 
@@ -636,7 +700,7 @@ Mixed Dictionary::do_get(const ClusterNode::State& s) const
     Mixed val = values.get(s.index);
 
     // Filter out potential unresolved links
-    if (!val.is_null() && val.get_type() == type_TypedLink) {
+    if (val.is_type(type_TypedLink)) {
         auto link = val.get<ObjLink>();
         auto key = link.get_obj_key();
         if (key.is_unresolved()) {
@@ -649,7 +713,7 @@ Mixed Dictionary::do_get(const ClusterNode::State& s) const
     return val;
 }
 
-std::pair<Mixed, Mixed> Dictionary::do_get_pair(const ClusterNode::State& s) const
+Mixed Dictionary::do_get_key(const ClusterNode::State& s) const
 {
     Mixed key;
     switch (m_key_type) {
@@ -671,10 +735,22 @@ std::pair<Mixed, Mixed> Dictionary::do_get_pair(const ClusterNode::State& s) con
             throw std::runtime_error("Not implemented");
             break;
     }
-    Mixed val = do_get(std::move(s));
-
-    return std::make_pair(key, val);
+    return key;
 }
+
+std::pair<Mixed, Mixed> Dictionary::do_get_pair(const ClusterNode::State& s) const
+{
+    return {do_get_key(s), do_get(s)};
+}
+
+bool Dictionary::clear_backlink(Mixed value, CascadeState& state) const
+{
+    if (value.is_type(type_TypedLink)) {
+        return m_obj.remove_backlink(m_col_key, value.get_link(), state);
+    }
+    return false;
+}
+
 /************************* Dictionary::Iterator *************************/
 
 Dictionary::Iterator::Iterator(const Dictionary* dict, size_t pos)

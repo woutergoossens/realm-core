@@ -372,7 +372,7 @@ TEST(Parser_invalid_queries)
 {
     for (auto& query : invalid_queries) {
         // std::cout << "query: " << query << std::endl;
-        CHECK_THROW_ANY(realm::query_parser::parse(query));
+        CHECK_THROW(realm::query_parser::parse(query), realm::query_parser::SyntaxError);
     }
 }
 
@@ -407,7 +407,7 @@ TEST(Parser_empty_input)
     t->create_objects(5, keys);
 
     // an empty query string is an invalid predicate
-    CHECK_THROW_ANY(verify_query(test_context, t, "", 5));
+    CHECK_THROW(verify_query(test_context, t, "", 5), realm::query_parser::SyntaxError);
 
     Query q = t->where(); // empty query
     std::string empty_description = q.get_description();
@@ -566,9 +566,12 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "age > 2 AND !FALSEPREDICATE", 2);
     verify_query(test_context, t, "age > 2 AND !TRUEPREDICATE", 0);
 
-    CHECK_THROW_ANY(verify_query(test_context, t, "buddy.age > $0", 0)); // no external parameters provided
-    CHECK_THROW_ANY(verify_query(test_context, t, "age == infinity", 0));  // integer vs infinity is not supported
-    CHECK_THROW_ANY(verify_query(test_context, t, "name == infinity", 0)); // string vs infinity is an invalid query
+    CHECK_THROW(verify_query(test_context, t, "buddy.age > $0", 0),
+                std::out_of_range); // no external parameters provided
+    CHECK_THROW(verify_query(test_context, t, "age == infinity", 0),
+                query_parser::InvalidQueryError); // integer vs infinity is not supported
+    CHECK_THROW(verify_query(test_context, t, "name == infinity", 0),
+                query_parser::InvalidQueryError); // string vs infinity is an invalid query
 
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "missing_property > 2", 0), message);
@@ -703,6 +706,7 @@ TEST(Parser_LinksToDifferentTable)
     // Null cannot be compared to lists
     CHECK_THROW_ANY(verify_query(test_context, t, "items == NULL", 0));
     CHECK_THROW_ANY(verify_query(test_context, t, "items != NULL", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "items.discount == NULL", 0));
 }
 
 
@@ -1208,18 +1212,28 @@ TEST(Parser_TwoColumnAggregates)
     verify_query(test_context, t, "items.@max.creation_date > account_creation_date", 3);
 
     // cannot aggregate string
-    CHECK_THROW_ANY(verify_query(test_context, t, "items.@min.name > account_balance", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "items.@max.name > account_balance", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "items.@sum.name > account_balance", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "items.@avg.name > account_balance", 0));
+    CHECK_THROW(verify_query(test_context, t, "items.@min.name > account_balance", 0),
+                query_parser::InvalidQueryError);
+    CHECK_THROW(verify_query(test_context, t, "items.@max.name > account_balance", 0),
+                query_parser::InvalidQueryError);
+    CHECK_THROW(verify_query(test_context, t, "items.@sum.name > account_balance", 0),
+                query_parser::InvalidQueryError);
+    CHECK_THROW(verify_query(test_context, t, "items.@avg.name > account_balance", 0),
+                query_parser::InvalidQueryError);
     // cannot aggregate link
-    CHECK_THROW_ANY(verify_query(test_context, t, "items.@min.discount > account_balance", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "items.@max.discount > account_balance", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "items.@sum.discount > account_balance", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "items.@avg.discount > account_balance", 0));
+    CHECK_THROW(verify_query(test_context, t, "items.@min.discount > account_balance", 0),
+                query_parser::InvalidQueryError);
+    CHECK_THROW(verify_query(test_context, t, "items.@max.discount > account_balance", 0),
+                query_parser::InvalidQueryError);
+    CHECK_THROW(verify_query(test_context, t, "items.@sum.discount > account_balance", 0),
+                query_parser::InvalidQueryError);
+    CHECK_THROW(verify_query(test_context, t, "items.@avg.discount > account_balance", 0),
+                query_parser::InvalidQueryError);
     // cannot do avg and sum on timestamp
-    CHECK_THROW_ANY(verify_query(test_context, t, "items.@sum.creation_date > account_creation_date", 2));
-    CHECK_THROW_ANY(verify_query(test_context, t, "items.@avg.creation_date > account_creation_date", 3));
+    CHECK_THROW(verify_query(test_context, t, "items.@sum.creation_date > account_creation_date", 2),
+                query_parser::InvalidQueryError);
+    CHECK_THROW(verify_query(test_context, t, "items.@avg.creation_date > account_creation_date", 3),
+                query_parser::InvalidQueryError);
 
     verify_query(test_context, t, "items.@count < account_balance", 3); // linklist count vs double
     verify_query(test_context, t, "items.@count > 3", 2);               // linklist count vs literal int
@@ -1318,7 +1332,7 @@ TEST(Parser_substitution)
     list_1.add(obj_keys[0]);
 
     util::Any args[] = {Int(2), Double(2.25), String("oe"), realm::null{}, Bool(true), Timestamp(1512130073, 505),
-                        bd0,    Float(2.33),  Int(1),       Int(3),        Int(4),     Bool(false)};
+                        bd0,    Float(2.33),  obj_keys[0],  Int(3),        Int(4),     Bool(false)};
     size_t num_args = 12;
     verify_query_sub(test_context, t, "age > $0", args, num_args, 2);
     verify_query_sub(test_context, t, "age > $0 || fees == $1", args, num_args, 3);
@@ -1337,6 +1351,7 @@ TEST(Parser_substitution)
     verify_query_sub(test_context, t, "nuldouble == $7", args, num_args, 1);
     verify_query_sub(test_context, t, "nuldouble == $3", args, num_args, 3);
     verify_query_sub(test_context, t, "links == $3", args, num_args, 3);
+    verify_query_sub(test_context, t, "list == $8", args, num_args, 2);
 
     // substitutions through collection aggregates is a different code path
     verify_query_sub(test_context, t, "list.@min.age < $0", args, num_args, 2);
@@ -1354,11 +1369,14 @@ TEST(Parser_substitution)
     verify_query_sub(test_context, t, "(age > $0 || fees == $1) && age == $0", args, num_args, 1);
 
     // negative index
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $-1", args, num_args, 0));
+    // FIXME: Should the error be std::out_of_range or SyntaxError?
+    CHECK_THROW(verify_query_sub(test_context, t, "age > $-1", args, num_args, 0), std::runtime_error);
     // missing index
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $", args, num_args, 0));
+    // FIXME: Should the error be SyntaxError?
+    CHECK_THROW(verify_query_sub(test_context, t, "age > $", args, num_args, 0), std::runtime_error);
     // non-numerical index
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $age", args, num_args, 0));
+    // FIXME: Should the error be SyntaxError?
+    CHECK_THROW(verify_query_sub(test_context, t, "age > $age", args, num_args, 0), std::runtime_error);
     // leading zero index
     verify_query_sub(test_context, t, "name CONTAINS[c] $002", args, num_args, 2);
     // double digit index
@@ -1563,9 +1581,7 @@ TEST(Parser_string_binary_encoding)
             , should_be_replaced(replace)
         {
         }
-        TestValues()
-        {
-        }
+        TestValues() {}
         size_t num_processed = 0;
         bool should_be_replaced = false;
     };
@@ -2085,7 +2101,9 @@ TEST(Parser_list_of_primitive_strings)
     auto col_str_list = t->add_column_list(type_String, "strings", nullable);
     CHECK_THROW_ANY(t->add_search_index(col_str_list));
 
-    auto get_string = [](size_t i) -> std::string { return util::format("string_%1", i); };
+    auto get_string = [](size_t i) -> std::string {
+        return util::format("string_%1", i);
+    };
     size_t num_populated_objects = 10;
     for (size_t i = 0; i < num_populated_objects; ++i) {
         Obj obj = t->create_object();
@@ -2145,10 +2163,10 @@ TEST(Parser_list_of_primitive_strings)
     verify_query(test_context, t, "strings.length == 0", 2);                     // {""}, {null}
     verify_query(test_context, t, "strings.length == 8", num_populated_objects); // "strings_0", ...  "strings_9"
 
-    CHECK_THROW_ANY(verify_query(test_context, t, "strings.@min == 2", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "strings.@max == 2", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "strings.@sum == 2", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "strings.@avg == 2", 0));
+    CHECK_THROW(verify_query(test_context, t, "strings.@min == 2", 0), query_parser::InvalidQueryError);
+    CHECK_THROW(verify_query(test_context, t, "strings.@max == 2", 0), query_parser::InvalidQueryError);
+    CHECK_THROW(verify_query(test_context, t, "strings.@sum == 2", 0), query_parser::InvalidQueryError);
+    CHECK_THROW(verify_query(test_context, t, "strings.@avg == 2", 0), query_parser::InvalidQueryError);
 }
 
 TEST_TYPES(Parser_list_of_primitive_element_lengths, StringData, BinaryData)
@@ -2793,10 +2811,10 @@ TEST(Parser_Backlinks)
 
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.items == NULL", 1), message);
-    CHECK_EQUAL(message, "Cannot compare linklist with NULL");
+    CHECK_EQUAL(message, "Cannot compare linklist ('@links.class_Person.items') with NULL");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.fav\\ item == NULL", 1),
                                 message);
-    CHECK_EQUAL(message, "Cannot compare linklist with NULL");
+    CHECK_EQUAL(message, "Cannot compare linklist ('@links.class_Person.fav\\ item') with NULL");
     CHECK_THROW_ANY(verify_query(test_context, items, "@links.attr. > 0", 1));
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Factory.items > 0", 1), message);
     CHECK_EQUAL(message, "No property 'items' found in type 'Factory' which links to type 'Items'");
@@ -2807,19 +2825,24 @@ TEST(Parser_Backlinks)
     query_parser::KeyPathMapping mapping;
     mapping.add_mapping(items, "purchasers", "@links.class_Person.items");
     mapping.add_mapping(t, "money", "account_balance");
+    mapping.add_table_mapping(t, "my-custom-class-name");
 
     verify_query(test_context, items, "purchasers.@count > 2", 2, mapping);
     verify_query(test_context, items, "purchasers.@max.money >= 20", 3, mapping);
+    verify_query(test_context, items, "@links.my-custom-class-name.items.@count > 2", 2, mapping);
 
     // check that arbitrary aliasing for named backlinks works with a arbitrary prefix
     query_parser::KeyPathMapping mapping_with_prefix;
     mapping_with_prefix.set_backlink_class_prefix("class_");
     mapping_with_prefix.add_mapping(items, "purchasers", "@links.Person.items");
+    mapping_with_prefix.add_mapping(t, "things", "items");
     mapping_with_prefix.add_mapping(t, "money", "account_balance");
     mapping_with_prefix.add_mapping(t, "funds", "money");     // double indirection
     mapping_with_prefix.add_mapping(t, "capital", "capital"); // self loop
     mapping_with_prefix.add_mapping(t, "banknotes", "finances");
     mapping_with_prefix.add_mapping(t, "finances", "banknotes"); // indirect loop
+    CHECK(mapping_with_prefix.add_table_mapping(t, "CustomPersonClassName"));
+    CHECK(!mapping_with_prefix.add_table_mapping(t, t->get_name()));
 
     verify_query(test_context, items, "purchasers.@count > 2", 2, mapping_with_prefix);
     verify_query(test_context, items, "purchasers.@max.money >= 20", 3, mapping_with_prefix);
@@ -2827,6 +2850,17 @@ TEST(Parser_Backlinks)
     verify_query(test_context, items, "SUBQUERY(purchasers, $x, $x.money >= 20).@count > 2", 1, mapping_with_prefix);
     // double indirection is allowed
     verify_query(test_context, items, "purchasers.@max.funds >= 20", 3, mapping_with_prefix);
+    // verbose backlinks syntax
+    verify_query(test_context, items, "@links.Person.items.@count > 2", 2, mapping_with_prefix);
+    // verbose backlinks syntax with 'class_' prefix
+    verify_query(test_context, items, "@links.class_Person.items.@count > 2", 2, mapping_with_prefix);
+    // class name substitution
+    verify_query(test_context, items, "@links.CustomPersonClassName.items.@count > 2", 2, mapping_with_prefix);
+    // property translation
+    verify_query(test_context, items, "@links.class_Person.things.@count > 2", 2, mapping_with_prefix);
+    // class and property translation
+    verify_query(test_context, items, "@links.CustomPersonClassName.things.@count > 2", 2, mapping_with_prefix);
+
     // infinite loops are detected
     CHECK_THROW_ANY_GET_MESSAGE(
         verify_query(test_context, items, "purchasers.@max.banknotes >= 20", 3, mapping_with_prefix), message);
@@ -3149,14 +3183,16 @@ TEST(Parser_Subquery)
     // subquery over link
     verify_query(test_context, t, "SUBQUERY(fav_item.allergens, $x, $x.name CONTAINS[c] 'dairy').@count > 0", 2);
     // nested subquery
-    verify_query(test_context, t, "SUBQUERY(items, $x, SUBQUERY($x.allergens, $allergy, $allergy.name CONTAINS[c] "
-                                  "'dairy').@count > 0).@count > 0",
+    verify_query(test_context, t,
+                 "SUBQUERY(items, $x, SUBQUERY($x.allergens, $allergy, $allergy.name CONTAINS[c] "
+                 "'dairy').@count > 0).@count > 0",
                  3);
     // nested subquery operating on the same table with same variable is not allowed
     std::string message;
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SUBQUERY(items, $x, "
-                                                              "SUBQUERY($x.discount.@links.class_Items.discount, $x, "
-                                                              "$x.price > 5).@count > 0).@count > 0",
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t,
+                                             "SUBQUERY(items, $x, "
+                                             "SUBQUERY($x.discount.@links.class_Items.discount, $x, "
+                                             "$x.price > 5).@count > 0).@count > 0",
                                              2),
                                 message);
     CHECK_EQUAL(message, "Unable to create a subquery expression with variable '$x' since an identical variable "
@@ -4125,6 +4161,7 @@ TEST(Parser_Mixed)
     auto col_int = table->add_column(type_Int, "int");
     auto col_link = origin->add_column(*table, "link");
     auto col_links = origin->add_column_list(*table, "links");
+
     size_t int_over_50 = 0;
     size_t nb_strings = 0;
     for (int64_t i = 0; i < 100; i++) {
@@ -4158,6 +4195,7 @@ TEST(Parser_Mixed)
             ++it;
         }
     }
+    origin->create_object(); // one with null links
 
     verify_query(test_context, table, "mixed > 50", int_over_50);
     verify_query(test_context, table, "mixed >= 50", int_over_50 + 1);
@@ -4176,9 +4214,19 @@ TEST(Parser_Mixed)
     verify_query(test_context, table, "mixed == oid(" + id.to_string() + ")", 1);
 
     char bin[1] = {0x34};
-    util::Any args[] = {BinaryData(bin)};
-    size_t num_args = 1;
+    util::Any args[] = {BinaryData(bin), ObjLink(table->get_key(), table->begin()->get_key()),
+                        ObjLink(origin->get_key(), origin->begin()->get_key()),
+                        ObjLink(TableKey(), ObjKey()), // null link
+                        realm::null{}};
+    size_t num_args = 5;
     verify_query_sub(test_context, table, "mixed endswith $0", args, num_args, 5); // 4, 24, 44, 64, 84
+    verify_query_sub(test_context, origin, "link == $1", args, num_args, 1);
+    verify_query_sub(test_context, origin, "link == $3", args, num_args, 1);
+    verify_query_sub(test_context, origin, "link == $4", args, num_args, 1);
+    verify_query_sub(test_context, origin, "link.@links.Origin.link == $2", args, num_args, 1); // poor man's SELF
+    verify_query_sub(test_context, origin, "ANY links == $1", args, num_args, 1);
+    verify_query_sub(test_context, origin, "ALL links == $1 && links.@size > 0", args, num_args, 0);
+    verify_query_sub(test_context, origin, "NONE links == $1 && links.@size > 0", args, num_args, 9);
 
     verify_query(test_context, table, "mixed == \"String2Binary\"", 1);
     verify_query(test_context, table, "mixed ==[c] \"string2binary\"", 1);
@@ -4190,11 +4238,23 @@ TEST(Parser_Mixed)
     verify_query(test_context, origin, "links.mixed beginswith[c] \"string\"", 10);
     verify_query(test_context, origin, "link.mixed > 50", 2);
     verify_query(test_context, origin, "link.mixed beginswith[c] \"string\"", 5);
-    verify_query(test_context, origin, "link.mixed == NULL", 0);
+    verify_query(test_context, origin, "link == NULL", 1);
+    verify_query(test_context, origin, "link.mixed == NULL", 1);
     verify_query(test_context, origin, "links.mixed == NULL", 1);
 
     // non-uniform type cross column comparisons
     verify_query(test_context, table, "mixed == int", 71);
+
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, table, "mixed == $1", args, num_args, 1), message);
+    CHECK_EQUAL(message, "Unsupported comparison between property of type 'mixed' and constant value: argument $1 of "
+                         "type 'typedLink' which links to 'Foo' with primary key 'ObjKey(0)'");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, origin, "link == $2", args, num_args, 0), message);
+    CHECK_EQUAL(message, "The relationship 'link' which links to type 'Foo' cannot be compared to an argument of "
+                         "type 'Origin' with primary key 'ObjKey(0)'");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, origin, "links == $2", args, num_args, 0), message);
+    CHECK_EQUAL(message, "The relationship 'links' which links to type 'Foo' cannot be compared to an argument of "
+                         "type 'Origin' with primary key 'ObjKey(0)'");
 }
 
 TEST(Parser_TypeOfValue)
@@ -4328,23 +4388,28 @@ TEST(Parser_Dictionary)
     auto col_link = origin->add_column(*foo, "link");
     auto col_links = origin->add_column_list(*foo, "links");
     size_t expected = 0;
+    size_t num_ints_for_value = 0;
 
     for (int64_t i = 0; i < 100; i++) {
         auto obj = foo->create_object();
         Dictionary dict = obj.get_dictionary(col_dict);
         bool incr = false;
+        bool incr_num_ints = false;
         if ((i % 4) == 0) {
             dict.insert("Value", i);
+            incr_num_ints = true;
             if (i > 50)
                 incr = true;
         }
         else if ((i % 10) == 0) {
             dict.insert("Value", 100);
             incr = true;
+            incr_num_ints = true;
         }
         if (i % 3) {
             dict.insert("Value", 3);
             incr = false;
+            incr_num_ints = true;
         }
         if ((i % 5) == 0) {
             dict.insert("Foo", 5);
@@ -4352,6 +4417,9 @@ TEST(Parser_Dictionary)
         dict.insert("Bar", i);
         if (incr) {
             expected++;
+        }
+        if (incr_num_ints) {
+            num_ints_for_value++;
         }
     }
 
@@ -4368,15 +4436,25 @@ TEST(Parser_Dictionary)
         }
     }
 
-    verify_query(test_context, foo, "dict > 50", 50);
-    verify_query(test_context, foo, "dict.Value > 50", expected);
-    verify_query(test_context, foo, "ANY dict.keys == 'Foo'", 20);
-    verify_query(test_context, foo, "NONE dict.keys == 'Value'", 23);
+    util::Any args[] = {String("Value")};
+    size_t num_args = 1;
 
-    verify_query(test_context, origin, "link.dict.Value > 50", 3);
-    verify_query(test_context, origin, "links.dict.Value > 50", 5);
+    verify_query(test_context, foo, "dict.@values > 50", 50);
+    verify_query(test_context, foo, "dict['Value'] > 50", expected);
+    verify_query_sub(test_context, foo, "dict[$0] > 50", args, num_args, expected);
+    verify_query(test_context, foo, "dict['Value'] > 50", expected);
+    verify_query(test_context, foo, "ANY dict.@keys == 'Foo'", 20);
+    verify_query(test_context, foo, "NONE dict.@keys == 'Value'", 23);
+    verify_query(test_context, foo, "dict['Value'].@type == 'int'", num_ints_for_value);
+    verify_query(test_context, foo, "dict.@type == 'int'", 100);      // ANY is implied, all have int values
+    verify_query(test_context, foo, "ALL dict.@type == 'int'", 100);  // all dictionaries have ints
+    verify_query(test_context, foo, "NONE dict.@type == 'int'", 0);   // each object has Bar:i
+    verify_query(test_context, foo, "ANY dict.@type == 'string'", 0); // no strings present
+
+    verify_query(test_context, origin, "link.dict['Value'] > 50", 3);
+    verify_query(test_context, origin, "links.dict['Value'] > 50", 5);
     verify_query(test_context, origin, "links.dict > 50", 6);
-    verify_query(test_context, origin, "links.dict.Value == NULL", 10);
+    verify_query(test_context, origin, "links.dict['Value'] == NULL", 10);
 
     verify_query(test_context, foo, "dict.@size == 3", 17);
     verify_query(test_context, foo, "dict.@max == 100", 2);
@@ -4386,10 +4464,18 @@ TEST(Parser_Dictionary)
 
     verify_query(test_context, origin, "links.dict.@max == 100", 2);
     verify_query(test_context, origin, "link.dict.@max == 100", 2);
+
     auto dict = foo->begin()->get_dictionary(col_dict);
+
+    dict.insert("some extra", 42);
+    verify_query(test_context, foo, "dict['some extra'] == 42", 1);
 
     dict.insert("Value", 4.5);
     std::string message;
+
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, origin, "link.dict.Value > 50", 3), message);
+    CHECK_EQUAL(message, "foo.dict is not a link column");
+
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, foo, "dict.@sum >= 100", 9), message);
     CHECK_EQUAL(message, "Cannot add int and double");
 
@@ -4397,6 +4483,43 @@ TEST(Parser_Dictionary)
     // g.to_json(std::cout);
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, foo, "dict.@sum >= 100", 9), message);
     CHECK_EQUAL(message, "Sum not defined for timestamps");
+}
+
+TEST(Parser_DictionaryObjects)
+{
+    Group g;
+    auto dogs = g.add_table_with_primary_key("dog", type_String, "name");
+    auto col_age = dogs->add_column(type_Int, "age");
+    auto persons = g.add_table_with_primary_key("person", type_String, "name");
+    auto col_dict = persons->add_column_dictionary(*dogs, "pets");
+    auto col_friend = persons->add_column(*persons, "friend");
+
+    Obj adam = persons->create_object_with_primary_key("adam");
+    Obj bernie = persons->create_object_with_primary_key("bernie");
+
+    Obj astro = dogs->create_object_with_primary_key("astro", {{col_age, 4}});
+    Obj pluto = dogs->create_object_with_primary_key("pluto", {{col_age, 5}});
+    Obj lady = dogs->create_object_with_primary_key("lady", {{col_age, 5}});
+    Obj snoopy = dogs->create_object_with_primary_key("snoopy", {{col_age, 3}});
+
+    auto adam_pets = adam.get_dictionary(col_dict);
+    adam_pets.insert("dog1", pluto);
+    adam_pets.insert("dog2", lady);
+    adam_pets.insert("none", ObjKey());
+
+    auto bernie_pets = bernie.get_dictionary(col_dict);
+    bernie_pets.insert("dog1", astro);
+    bernie_pets.insert("dog2", snoopy);
+
+    adam.set(col_friend, bernie.get_key());
+    bernie.set(col_friend, adam.get_key());
+
+    auto q = persons->link(col_dict).column<Int>(col_age) > 4;
+    CHECK_EQUAL(q.count(), 1);
+    q = persons->link(col_friend).link(col_dict).column<Int>(col_age) > 4;
+    CHECK_EQUAL(q.count(), 1);
+
+    verify_query(test_context, persons, "pets.@values.age > 4", 1);
 }
 
 TEST_TYPES(Parser_Set, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Decimal128>, Prop<ObjectId>, Prop<Timestamp>,

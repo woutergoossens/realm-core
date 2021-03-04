@@ -31,17 +31,14 @@
 namespace realm {
 
 namespace _impl {
-class SetNotifier;
+class ListNotifier;
 }
 
 namespace object_store {
 
 class Set : public Collection {
 public:
-    Set() noexcept;
-    Set(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col);
-    Set(std::shared_ptr<Realm> r, const realm::SetBase& set);
-    ~Set();
+    using Collection::Collection;
 
     Set(const Set&);
     Set& operator=(const Set&);
@@ -49,6 +46,7 @@ public:
     Set& operator=(Set&&);
 
     Query get_query() const;
+    ConstTableRef get_table() const;
 
     template <class T>
     size_t find(const T&) const;
@@ -85,11 +83,7 @@ public:
     template <typename T = Obj>
     T get(size_t row_ndx) const;
 
-    Results sort(SortDescriptor order) const;
-    Results sort(const std::vector<std::pair<std::string, bool>>& keypaths) const;
     Results filter(Query q) const;
-
-    Results snapshot() const;
 
     Set freeze(const std::shared_ptr<Realm>& realm) const;
 
@@ -104,16 +98,18 @@ public:
     Mixed sum(ColKey column = {}) const;
 
     bool is_subset_of(const Set& rhs) const;
+    bool is_strict_subset_of(const Set& rhs) const;
     bool is_superset_of(const Set& rhs) const;
+    bool is_strict_superset_of(const Set& rhs) const;
     bool intersects(const Set& rhs) const;
+    bool set_equals(const Set& rhs) const;
 
     void assign_intersection(const Set& rhs);
     void assign_union(const Set& rhs);
     void assign_difference(const Set& rhs);
+    void assign_symmetric_difference(const Set& rhs);
 
     bool operator==(const Set& rhs) const noexcept;
-
-    NotificationToken add_notification_callback(CollectionChangeCallback cb) &;
 
     struct InvalidEmbeddedOperationException : std::logic_error {
         InvalidEmbeddedOperationException()
@@ -123,10 +119,11 @@ public:
     };
 
 private:
-    _impl::CollectionNotifier::Handle<_impl::SetNotifier> m_notifier;
-    std::shared_ptr<realm::SetBase> m_set_base;
-
-    ConstTableRef get_target_table() const;
+    SetBase& set_base() const noexcept
+    {
+        REALM_ASSERT_DEBUG(dynamic_cast<SetBase*>(m_coll_base.get()));
+        return static_cast<SetBase&>(*m_coll_base);
+    }
 
     template <class Fn>
     auto dispatch(Fn&&) const;
@@ -143,25 +140,25 @@ auto Set::dispatch(Fn&& fn) const
     return switch_on_type(get_type(), std::forward<Fn>(fn));
 }
 
-template <class T>
+template <typename T>
 auto& Set::as() const
 {
-    REALM_ASSERT(dynamic_cast<realm::Set<T>*>(m_set_base.get()));
-    return static_cast<realm::Set<T>&>(*m_set_base);
+    REALM_ASSERT_DEBUG(dynamic_cast<realm::Set<T>*>(m_coll_base.get()));
+    return static_cast<realm::Set<T>&>(*m_coll_base);
 }
 
 template <>
 inline auto& Set::as<Obj>() const
 {
-    REALM_ASSERT(dynamic_cast<LnkSet*>(&*m_set_base));
-    return static_cast<LnkSet&>(*m_set_base);
+    REALM_ASSERT_DEBUG(dynamic_cast<LnkSet*>(m_coll_base.get()));
+    return static_cast<LnkSet&>(*m_coll_base);
 }
 
 template <>
 inline auto& Set::as<ObjKey>() const
 {
-    REALM_ASSERT(dynamic_cast<LnkSet*>(&*m_set_base));
-    return static_cast<LnkSet&>(*m_set_base);
+    REALM_ASSERT_DEBUG(dynamic_cast<LnkSet*>(m_coll_base.get()));
+    return static_cast<LnkSet&>(*m_coll_base);
 }
 
 template <class T, class Context>
