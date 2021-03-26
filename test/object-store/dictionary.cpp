@@ -478,10 +478,17 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
 
             advance_and_notify(*r);
             auto ndx = values_as_results.index_of(T(values[0]));
+            auto ndx_sorted = sorted.index_of(T(values[0]));
+
             REQUIRE_INDICES(change.insertions, ndx);
+            REQUIRE_INDICES(change.modifications);
+            REQUIRE_INDICES(change.deletions);
             REQUIRE_INDICES(rchange.insertions, ndx);
-            // values[0] is max(), so it ends up at the end of the sorted list
-            REQUIRE_INDICES(srchange.insertions, values.size() - 1);
+            REQUIRE_INDICES(rchange.modifications);
+            REQUIRE_INDICES(rchange.deletions);
+            REQUIRE_INDICES(srchange.insertions, ndx_sorted);
+            REQUIRE_INDICES(srchange.modifications);
+            REQUIRE_INDICES(srchange.deletions);
         }
 
         SECTION("replace value in dictionary") {
@@ -499,9 +506,16 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
 
             advance_and_notify(*r);
             auto ndx = values_as_results.index_of(T(values[0]));
+            auto ndx_sorted = sorted.index_of(T(values[0]));
             REQUIRE_INDICES(change.insertions);
             REQUIRE_INDICES(change.modifications, ndx);
             REQUIRE_INDICES(change.deletions);
+            REQUIRE_INDICES(rchange.insertions);
+            REQUIRE_INDICES(rchange.modifications, ndx);
+            REQUIRE_INDICES(rchange.deletions);
+            REQUIRE_INDICES(srchange.insertions, ndx_sorted);
+            REQUIRE_INDICES(srchange.modifications);
+            REQUIRE_INDICES(srchange.deletions, ndx_sorted);
         }
 
         SECTION("remove value from dictionary") {
@@ -513,8 +527,15 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             r->commit_transaction();
 
             advance_and_notify(*r);
+
+            REQUIRE_INDICES(change.insertions);
+            REQUIRE_INDICES(change.modifications);
             REQUIRE_INDICES(change.deletions, ndx);
+            REQUIRE_INDICES(rchange.insertions);
+            REQUIRE_INDICES(rchange.modifications);
             REQUIRE_INDICES(rchange.deletions, ndx);
+            REQUIRE_INDICES(srchange.insertions);
+            REQUIRE_INDICES(srchange.modifications);
             REQUIRE_INDICES(srchange.deletions, ndx_sorted);
         }
 
