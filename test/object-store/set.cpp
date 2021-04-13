@@ -407,6 +407,29 @@ TEST_CASE("set", "[set]") {
         }
     }
 
+    SECTION("isolate snapshot from set") {
+        object_store::Set set{r, obj, col_int_set};
+
+        write([&]() {
+            CHECK(set.insert(1).second);
+            CHECK(set.insert(2).second);
+            CHECK(set.insert(3).second);
+            CHECK(set.insert(4).second);
+        });
+
+        auto snap = set.as_results().snapshot();
+        int recordsCount = snap.size();
+        int deleteCount = 0;
+        advance_and_notify(*r);
+        r->begin_transaction();
+        for(int i=0; i<snap.size(); i++) {
+            set.remove(0);
+            deleteCount++;
+        }
+        r->cancel_transaction();
+        REQUIRE(recordsCount == deleteCount);
+    }
+
     SECTION("assign intersection") {
         object_store::Set set{r, obj, col_link_set};
         object_store::Set set2{r, other_obj, other_col_link_set};

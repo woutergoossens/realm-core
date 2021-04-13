@@ -504,6 +504,21 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             REQUIRE_INDICES(change.deletions);
         }
 
+        SECTION("isolate snapshot from dictionary") {
+            auto snap = dict.as_results().snapshot();
+            int recordsCount = snap.size();
+            int deleteCount = 0;
+            advance_and_notify(*r);
+            r->begin_transaction();
+            for(int i=0; i<snap.size(); i++) {
+                auto element = snap.get_dictionary_element(i);
+                dict.erase(element.first);
+                deleteCount++;
+            }
+            r->cancel_transaction();
+            REQUIRE(recordsCount == deleteCount);
+        }
+
         SECTION("remove value from dictionary") {
             advance_and_notify(*r);
             auto ndx = values_as_results.index_of(T(values[0]));
