@@ -912,7 +912,7 @@ TEST_CASE("notifications: skip") {
     };
 
     auto make_remote_change = [&] {
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
+        auto r2 = coordinator->get_realm(util::Scheduler::make_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->create_object();
         r2->commit_transaction();
@@ -1123,6 +1123,27 @@ TEST_CASE("notifications: skip") {
         REQUIRE(calls1 == 1);
     }
 
+    SECTION("run_async_notifiers() processes new notifier between suppress_next() and commit_transaction()") {
+        advance_and_notify(*r);
+
+        // Create a new notifier and then immediately remove the callback so
+        // that begin_transaction() doesn't block
+        Results results2(r, r->read_group().get_table("class_object")->where());
+        results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {});
+
+        r->begin_transaction();
+        table->create_object();
+        token1.suppress_next();
+
+        // If this spuriously reruns existing notifiers it'll clear skip_next
+        on_change_but_no_notify(*r);
+        r->commit_transaction();
+
+        // And then this'll fail to skip the write
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+    }
+
     SECTION("skipping from a write inside the skipped callback works") {
         NotificationToken token2 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
             if (c.empty())
@@ -1261,7 +1282,7 @@ TEST_CASE("notifications: TableView delivery") {
     };
 
     auto make_remote_change = [&] {
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
+        auto r2 = coordinator->get_realm(util::Scheduler::make_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->create_object();
         r2->commit_transaction();
@@ -2357,7 +2378,7 @@ TEST_CASE("results: notifier with no callbacks") {
         // create a notifier
         results.add_notification_callback([](CollectionChangeSet const&, std::exception_ptr) {});
 
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
+        auto r2 = coordinator->get_realm(util::Scheduler::make_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->create_object();
         r2->commit_transaction();
