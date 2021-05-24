@@ -918,7 +918,7 @@ TEST_CASE("Realm::delete_files()") {
     }
 
     SECTION("Trying to delete files of an open Realm fails.") {
-        REQUIRE_FALSE(Realm::delete_files(path));
+        REQUIRE_THROWS(Realm::delete_files(path));
         REQUIRE(util::File::exists(path + ".lock"));
         REQUIRE(util::File::exists(path));
         REQUIRE(util::File::exists(path + ".management"));
