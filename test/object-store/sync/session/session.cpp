@@ -249,6 +249,56 @@ TEST_CASE("SyncSession: close() API", "[sync]") {
     }
 }
 
+TEST_CASE("delete_files") {
+
+    TestSyncManager test_sync_manager;
+    auto app = test_sync_manager.app();
+    auto user = app->sync_manager()->get_user("close-api-tests-user", ENCODE_FAKE_JWT("fake_refresh_token"),
+                                              ENCODE_FAKE_JWT("fake_access_token"), "https://realm.example.org",
+                                              dummy_device_id);
+    auto schema = Schema{
+        {"object",
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"value", PropertyType::Int},
+         }},
+    };
+    Realm::Config config;
+
+    auto session = sync_session(
+        user, "/test-path",
+        [&](auto, auto) {
+            // error_handler_invoked = true;
+        },
+        SyncSessionStopPolicy::Immediately, nullptr, schema, &config);
+
+    EventLoop::main().run_until([&] {
+        return sessions_are_active(*session);
+    });
+
+    SECTION("") {
+        // Add an object so there's something to upload
+        auto shared_realm = Realm::get_shared_realm(config);
+        TableRef table = ObjectStore::table_for_object_type(shared_realm->read_group(), "object");
+        shared_realm->begin_transaction();
+        table->create_object_with_primary_key(0);
+        // shared_realm->delete_files(config.path);
+        shared_realm->commit_transaction();
+
+        REQUIRE_THROWS(shared_realm->delete_files(config.path));
+
+        shared_realm->close();
+
+        REQUIRE_THROWS(shared_realm->delete_files(config.path));
+
+        EventLoop::main().run_until([&] {
+            return sessions_are_inactive(*session);
+        });
+
+        shared_realm->delete_files(config.path);
+    }
+}
+
 TEST_CASE("SyncSession: shutdown_and_wait() API", "[sync]") {
     TestSyncManager init_sync_manager;
     auto app = init_sync_manager.app();
