@@ -291,9 +291,9 @@ TEST_CASE("delete_files") {
 
         REQUIRE_THROWS(shared_realm->delete_files(config.path));
 
-        EventLoop::main().run_until([&] {
-            return sessions_are_inactive(*session);
-        });
+        // EventLoop::main().run_until([&] {
+        //     return sessions_are_inactive(*session);
+        // });
 
         shared_realm->delete_files(config.path);
     }
