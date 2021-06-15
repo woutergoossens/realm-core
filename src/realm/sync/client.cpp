@@ -1,4 +1,4 @@
-#include <tuple>
+
 #include <atomic>
 
 #include <realm/util/value_reset_guard.hpp>
@@ -560,6 +560,7 @@ inline ClientImpl::ClientImpl(Client::Config config)
                  config.tcp_no_delay); // Throws
     logger.debug("Config param: disable_sync_to_disk = %1",
                  config.disable_sync_to_disk); // Throws
+    logger.debug("Config param: enable_query_based_sync = %1", config.enable_query_based_sync);
     logger.debug("User agent string: '%1'", get_user_agent_string());
 
     if (config.reconnect_mode != ReconnectMode::normal) {
@@ -715,6 +716,7 @@ ClientImplBase::Config ClientImpl::make_client_impl_base_config(Client::Config& 
     ClientImplBase::Config config_2;
 
     // clang-format off
+    config_2.enable_query_based_sync         = config.enable_query_based_sync;
     config_2.user_agent_platform_info        = std::move(config.user_agent_platform_info);
     config_2.user_agent_application_info     = std::move(config.user_agent_application_info);
     config_2.logger                          = config.logger;
@@ -1530,6 +1532,7 @@ auto SessionWrapper::make_session_impl_config(SyncTransactReporter& transact_rep
     config_2.sync_transact_reporter = &transact_reporter;
     config_2.disable_upload = config.disable_upload;
     config_2.disable_empty_upload = config.disable_empty_upload;
+    config_2.query = config.query;
     return config_2;
 }
 

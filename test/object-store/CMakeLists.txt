@@ -55,6 +55,7 @@ if(REALM_ENABLE_SYNC)
         sync/sync_test_utils.cpp
         sync/user.cpp
         sync/app.cpp
+        sync/qbs.cpp
     )
 
 endif()
@@ -86,7 +87,12 @@ if(REALM_ENABLE_SYNC)
             REALM_MONGODB_ENDPOINT="${REALM_MONGODB_ENDPOINT}"
         )
 
+        #include(FindPkgConfig)
+        #pkg_check_modules(MONGOCXX REQUIRED IMPORTED_TARGET libmongocxx libbsoncxx)
+
         find_package(CURL REQUIRED)
+        #target_link_libraries(ObjectStoreTests CURL::libcurl PkgConfig::MONGOCXX)
+
         target_link_libraries(ObjectStoreTests CURL::libcurl)
     endif()
 endif()

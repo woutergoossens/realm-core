@@ -155,6 +155,14 @@ struct SyncConfig {
                                    const char* pem_data, size_t pem_size, int preverify_ok, int depth);
 
     std::shared_ptr<SyncUser> user;
+    // TODO instead of passsing in the query as a string, we should take it in some parsed form. For now
+    // this should be an XJSON object where each table has an MQL query assigned to it like this:
+    // {
+    //   "People": {"name": "Joe"},
+    //   "Pets": {"type":{"$in":["dog", "cat"]}},
+    //   "Hobbies": {"name":{"$ne": "golf"}}
+    // }
+    util::Optional<std::string> query_value;
     std::string partition_value;
     SyncSessionStopPolicy stop_policy = SyncSessionStopPolicy::AfterChangesUploaded;
     std::function<SyncSessionErrorHandler> error_handler;
@@ -178,7 +186,6 @@ struct SyncConfig {
 
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);
-    explicit SyncConfig(std::shared_ptr<SyncUser> user, const char* partition);
 };
 
 } // namespace realm

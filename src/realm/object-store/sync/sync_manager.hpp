@@ -80,6 +80,7 @@ struct SyncClientConfig {
     util::Logger::Level log_level = util::Logger::Level::info;
     ReconnectMode reconnect_mode = ReconnectMode::normal;
     bool multiplex_sessions = false;
+    bool enable_query_based_sync = false;
 
     // Optional information about the binding/application that is sent as part of the User-Agent
     // when establishing a connection to the server.

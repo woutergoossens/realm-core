@@ -71,10 +71,4 @@ SyncConfig::SyncConfig(std::shared_ptr<SyncUser> user, std::string partition)
     , partition_value(std::move(partition))
 {
 }
-SyncConfig::SyncConfig(std::shared_ptr<SyncUser> user, const char* partition)
-    : user(std::move(user))
-    , partition_value(partition)
-{
-}
-
 } // namespace realm

@@ -44,6 +44,7 @@ struct SyncClient {
             c.logger = logger.get();
             c.reconnect_mode = config.reconnect_mode;
             c.one_connection_per_session = !config.multiplex_sessions;
+            c.enable_query_based_sync = config.enable_query_based_sync;
             c.user_agent_application_info =
                 util::format("%1 %2", config.user_agent_binding_info, config.user_agent_application_info);
 

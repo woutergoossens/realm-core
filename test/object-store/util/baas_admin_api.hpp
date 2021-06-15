@@ -110,6 +110,7 @@ struct AppCreateConfig {
 
     Schema schema;
     Property partition_key;
+    bool query_based_sync_enabled;
     bool dev_mode_enabled;
 
     std::vector<FunctionDef> functions;
@@ -120,6 +121,8 @@ struct AppCreateConfig {
     bool enable_anonymous_auth = false;
 };
 
+// Returns the base URL configured via compile-time definition.
+StringData get_base_url();
 AppCreateConfig default_app_config(const std::string& base_url);
 AppCreateConfig minimal_app_config(const std::string& base_url, const std::string& name, const Schema& schema);
 

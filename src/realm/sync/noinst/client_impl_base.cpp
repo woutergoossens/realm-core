@@ -107,6 +107,7 @@ bool ClientImplBase::decompose_server_url(const std::string& url, ProtocolEnvelo
 
 ClientImplBase::ClientImplBase(Config config)
     : logger{config.logger ? *config.logger : g_fallback_logger}
+    , m_query_based_sync_enabled(config.enable_query_based_sync)
     , m_reconnect_mode{config.reconnect_mode}
     , m_connect_timeout{config.connect_timeout}
     , m_connection_linger_time{config.connection_linger_time}
@@ -344,7 +345,13 @@ void Connection::websocket_handshake_completion_handler(const HTTPHeaders& heade
     auto i = headers.find("Sec-WebSocket-Protocol");
     if (i != headers.end()) {
         util::StringView value = i->second;
-        util::StringView prefix = sync::get_websocket_protocol_prefix();
+        util::StringView prefix;
+        if (m_client.m_query_based_sync_enabled) {
+            prefix = sync::get_qbs_websocket_protocol_prefix();
+        }
+        else {
+            prefix = sync::get_pbs_websocket_protocol_prefix();
+        }
         // FIXME: Use std::string_view::begins_with() in C++20.
         bool begins_with =
             (value.size() >= prefix.size() && std::equal(value.data(), value.data() + prefix.size(), prefix.data()));
@@ -945,7 +952,12 @@ void Connection::initiate_websocket_handshake()
         std::ostringstream out;
         out.exceptions(std::ios_base::failbit | std::ios_base::badbit);
         out.imbue(std::locale::classic());
-        const char* protocol_prefix = sync::get_websocket_protocol_prefix();
+        const char* protocol_prefix = [&] {
+            if (m_client.m_query_based_sync_enabled) {
+                return sync::get_qbs_websocket_protocol_prefix();
+            }
+            return sync::get_pbs_websocket_protocol_prefix();
+        }();
         int min = get_oldest_supported_protocol_version();
         int max = sync::get_current_protocol_version();
         REALM_ASSERT(min <= max);
@@ -1569,6 +1581,7 @@ void Connection::receive_state_message(session_ident_type session_ident, version
 
 void Connection::receive_download_message(session_ident_type session_ident, const SyncProgress& progress,
                                           std::uint_fast64_t downloadable_bytes,
+                                          sync::query_version_type query_version, bool is_last_in_batch,
                                           const ReceivedChangesets& received_changesets)
 {
     Session* sess = get_session(session_ident);
@@ -1579,7 +1592,8 @@ void Connection::receive_download_message(session_ident_type session_ident, cons
         return;
     }
 
-    sess->receive_download_message(progress, downloadable_bytes, received_changesets); // Throws
+    sess->receive_download_message(progress, downloadable_bytes, query_version, is_last_in_batch,
+                                   received_changesets); // Throws
 }
 
 
@@ -2101,17 +2115,28 @@ void Session::send_ident_message()
     REALM_ASSERT(!m_unbind_message_sent);
     REALM_ASSERT(have_client_file_ident());
 
-    logger.debug("Sending: IDENT(client_file_ident=%1, client_file_ident_salt=%2, "
-                 "scan_server_version=%3, scan_client_version=%4, latest_server_version=%5, "
-                 "latest_server_version_salt=%6)",
-                 m_client_file_ident.ident, m_client_file_ident.salt, m_progress.download.server_version,
-                 m_progress.download.last_integrated_client_version, m_progress.latest_server_version.version,
-                 m_progress.latest_server_version.salt); // Throws
 
     ClientProtocol& protocol = m_conn.get_client_protocol();
     OutputBuffer& out = m_conn.get_output_buffer();
     session_ident_type session_ident = m_ident;
-    protocol.make_ident_message(out, session_ident, m_client_file_ident, m_progress); // Throws
+    if (m_qbs_query) {
+        logger.debug("Sending: IDENT(client_file_ident=%1, client_file_ident_salt=%2, "
+                     "scan_server_version=%3, scan_client_version=%4, latest_server_version=%5, "
+                     "latest_server_version_salt=%6, qbs_query: \"%7\")",
+                     m_client_file_ident.ident, m_client_file_ident.salt, m_progress.download.server_version,
+                     m_progress.download.last_integrated_client_version, m_progress.latest_server_version.version,
+                     m_progress.latest_server_version.salt, *m_qbs_query);                                 // Throws
+        protocol.make_qbs_ident_message(out, session_ident, m_client_file_ident, m_progress, m_qbs_query); // Throws
+    }
+    else {
+        logger.debug("Sending: IDENT(client_file_ident=%1, client_file_ident_salt=%2, "
+                     "scan_server_version=%3, scan_client_version=%4, latest_server_version=%5, "
+                     "latest_server_version_salt=%6)",
+                     m_client_file_ident.ident, m_client_file_ident.salt, m_progress.download.server_version,
+                     m_progress.download.last_integrated_client_version, m_progress.latest_server_version.version,
+                     m_progress.latest_server_version.salt);                                  // Throws
+        protocol.make_pbs_ident_message(out, session_ident, m_client_file_ident, m_progress); // Throws
+    }
     m_conn.initiate_write_message(out, this);                                         // Throws
 
     m_ident_message_sent = true;
@@ -2609,16 +2634,20 @@ void Session::receive_state_message(version_type server_version, salt_type serve
 
 
 void Session::receive_download_message(const SyncProgress& progress, std::uint_fast64_t downloadable_bytes,
+                                       sync::query_version_type query_version, bool is_last_in_batch,
                                        const ReceivedChangesets& received_changesets)
 {
     logger.debug("Received: DOWNLOAD(download_server_version=%1, download_client_version=%2, "
                  "latest_server_version=%3, latest_server_version_salt=%4, "
                  "upload_client_version=%5, upload_server_version=%6, downloadable_bytes=%7, "
-                 "num_changesets=%8, ...)",
+                 "query_version = %8, is_last_in_batch = %9"
+                 "num_changesets=%10, ...)",
                  progress.download.server_version, progress.download.last_integrated_client_version,
                  progress.latest_server_version.version, progress.latest_server_version.salt,
                  progress.upload.client_version, progress.upload.last_integrated_server_version, downloadable_bytes,
-                 received_changesets.size()); // Throws
+                 query_version, is_last_in_batch, received_changesets.size()); // Throws
+
+    const bool query_based_sync_enabled = get_client().m_query_based_sync_enabled;
 
     // Ignore the message if the deactivation process has been initiated,
     // because in that case, the associated Realm must not be accessed any
@@ -2645,6 +2674,11 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
         // Check that per-changeset server version is strictly increasing.
         bool good_server_version = (changeset.remote_version > server_version &&
                                     changeset.remote_version <= progress.download.server_version);
+        // In QBS, the server version of zero means that the changeset is synthetic and created from the state store.
+        // TODO Fix this.
+        if (query_based_sync_enabled && !good_server_version && changeset.remote_version == 0) {
+            good_server_version = true;
+        }
         if (!good_server_version) {
             logger.error("Bad server version in changeset header (DOWNLOAD) (%1, %2, %3)", changeset.remote_version,
                          server_version, progress.download.server_version);
@@ -2657,6 +2691,10 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
         bool good_client_version =
             (changeset.last_integrated_local_version >= last_integrated_client_version &&
              changeset.last_integrated_local_version <= progress.download.last_integrated_client_version);
+        // TODO is this necessary
+        if (query_based_sync_enabled && !good_client_version && changeset.remote_version == 0) {
+            good_client_version = true;
+        }
         if (!good_client_version) {
             logger.error("Bad last integrated client version in changeset header (DOWNLOAD) "
                          "(%1, %2, %3)",
@@ -2670,6 +2708,11 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
         // file identifier.
         bool good_file_ident =
             (changeset.origin_file_ident > 0 && changeset.origin_file_ident != m_client_file_ident.ident);
+
+        // TODO this is broken, needs to be fixed for QBS.
+        if (query_based_sync_enabled && !good_file_ident && changeset.origin_file_ident == 1) {
+            good_file_ident = true;
+        }
         if (!good_file_ident) {
             logger.error("Bad origin file identifier");
             m_conn.close_due_to_protocol_error(ClientError::bad_origin_file_ident);

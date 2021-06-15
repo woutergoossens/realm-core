@@ -82,21 +82,6 @@ public:
     }
 };
 
-#ifdef REALM_MONGODB_ENDPOINT
-std::string get_base_url()
-{
-    // allows configuration with or without quotes
-    std::string base_url = REALM_QUOTE(REALM_MONGODB_ENDPOINT);
-    if (base_url.size() > 0 && base_url[0] == '"') {
-        base_url.erase(0, 1);
-    }
-    if (base_url.size() > 0 && base_url[base_url.size() - 1] == '"') {
-        base_url.erase(base_url.size() - 1);
-    }
-    return base_url;
-}
-#endif
-
 struct AutoVerifiedEmailCredentials {
     AutoVerifiedEmailCredentials()
     {
@@ -1736,7 +1721,9 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
     auto password = std::string{"password"};
 
     {
-        TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
+        TestSyncManager::Config test_sync_config(app_config);
+        test_sync_config.verbose_sync_client_logging = true;
+        TestSyncManager sync_manager(test_sync_config, {});
         auto app = sync_manager.app();
         app->provider_client<App::UsernamePasswordProviderClient>().register_email(
             email, password, [&](Optional<app::AppError> error) {

@@ -2677,7 +2677,8 @@ void parse_remote_changeset(const Transformer::RemoteChangeset& remote_changeset
     // origin_file_ident = 0 is currently used to indicate an entry of local
     // origin.
     REALM_ASSERT(remote_changeset.origin_file_ident != 0);
-    REALM_ASSERT(remote_changeset.remote_version != 0);
+    // TODO uncomment this assertion as part of QBS
+    // REALM_ASSERT(remote_changeset.remote_version != 0);
 
     ChunkedBinaryInputStream remote_in{remote_changeset.data};
     try {

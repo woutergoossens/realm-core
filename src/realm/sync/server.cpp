@@ -2048,7 +2048,7 @@ private:
             HttpListHeaderValueParser parser{value};
             util::StringView elem;
             while (parser.next(elem)) {
-                util::StringView prefix = get_websocket_protocol_prefix();
+                util::StringView prefix = get_pbs_websocket_protocol_prefix();
                 // FIXME: Use std::string_view::begins_with() in C++20.
                 bool begins_with = (elem.size() >= prefix.size() &&
                                     std::equal(elem.data(), elem.data() + prefix.size(), prefix.data()));
@@ -2193,7 +2193,7 @@ private:
         {
             std::ostringstream out;
             out.imbue(std::locale::classic());
-            out << get_websocket_protocol_prefix() << negotiated_protocol_version; // Throws
+            out << get_pbs_websocket_protocol_prefix() << negotiated_protocol_version; // Throws
             sec_websocket_protocol_2 = std::move(out).str();
         }
 

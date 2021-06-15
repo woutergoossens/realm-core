@@ -530,8 +530,9 @@ bool ClientHistoryImpl::integrate_server_changesets(const SyncProgress& progress
         for (std::size_t i = 0; i < num_changesets; ++i) {
             const RemoteChangeset& changeset = incoming_changesets[i];
             REALM_ASSERT(changeset.last_integrated_local_version <= local_version);
-            REALM_ASSERT(changeset.origin_file_ident > 0 &&
-                         changeset.origin_file_ident != transact->get_sync_file_id());
+            // TODO This is broken in the QBS server right now
+            // REALM_ASSERT(changeset.origin_file_ident > 0 &&
+            //             changeset.origin_file_ident != transact->get_sync_file_id());
             downloaded_bytes_in_message += changeset.original_changeset_size;
 
             sync::parse_remote_changeset(changeset, changesets[i]); // Throws

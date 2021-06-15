@@ -249,6 +249,7 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
     sc_config.base_file_path = m_base_file_path;
     sc_config.metadata_mode = config.metadata_mode;
     sc_config.log_level = config.verbose_sync_client_logging ? util::Logger::Level::all : util::Logger::Level::off;
+    sc_config.enable_query_based_sync = config.enable_query_based_sync;
 
     m_app = app::App::get_shared_app(app_config, sc_config);
     m_app->sync_manager()->set_sync_route((config.base_url.empty() ? m_sync_server.base_url() : config.base_url) +

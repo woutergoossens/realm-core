@@ -30,9 +30,14 @@ constexpr int get_current_protocol_version() noexcept
     return 3;
 }
 
-constexpr const char* get_websocket_protocol_prefix() noexcept
+constexpr const char* get_pbs_websocket_protocol_prefix() noexcept
 {
     return "com.mongodb.realm-sync/";
+}
+
+constexpr const char* get_qbs_websocket_protocol_prefix() noexcept
+{
+    return "com.mongodb.realm-query-sync/";
 }
 
 
@@ -72,6 +77,7 @@ using file_ident_type    = std::uint_fast64_t;
 using version_type       = Replication::version_type;
 using salt_type          = std::int_fast64_t;
 using timestamp_type     = std::uint_fast64_t;
+using query_version_type = std::int64_t;
 using session_ident_type = std::uint_fast64_t;
 using request_ident_type = std::uint_fast64_t;
 using milliseconds_type  = std::int_fast64_t;

@@ -263,6 +263,22 @@ size_t curl_header_cb(char* buffer, size_t size, size_t nitems, std::map<std::st
 
 } // namespace
 
+StringData get_base_url()
+{
+#ifdef REALM_MONGODB_ENDPOINT
+    StringData base_url(REALM_QUOTE(REALM_MONGODB_ENDPOINT));
+#else
+#error Must define REALM_MONGODB_ENDPOINT to use baas admin api tests
+#endif
+    if (base_url.size() > 0 && base_url[0] == '"') {
+        base_url = base_url.substr(1);
+    }
+    if (base_url.size() > 0 && base_url[base_url.size() - 1] == '"') {
+        base_url = base_url.prefix(base_url.size() - 1);
+    }
+    return base_url;
+}
+
 app::Response do_http_request(const app::Request& request)
 {
     CurlGlobalGuard curl_global_guard;
@@ -593,12 +609,13 @@ AppCreateConfig default_app_config(const std::string& base_url)
         db_name,
         std::move(default_schema),
         std::move(partition_key),
-        true,
-        std::move(funcs),
-        std::move(user_pass_config),
-        std::string{"authFunc"},
-        true,
-        true,
+        false,                       // query based sync disabled
+        true,                        // dev_mode_enabled
+        std::move(funcs),            // functions
+        std::move(user_pass_config), // enable basic user/pass auth
+        util::none,                  // disable custom auth
+        true,                        // enable api key auth
+        true,                        // enable anonymous auth
     };
 }
 
@@ -621,6 +638,7 @@ AppCreateConfig minimal_app_config(const std::string& base_url, const std::strin
         util::format("test_data_%1_%2", name, id.to_string()),
         schema,
         std::move(partition_key),
+        false,                       // query based sync disabled
         true,                        // dev_mode_enabled
         {},                          // no functions
         std::move(user_pass_config), // enable basic user/pass auth
@@ -705,30 +723,36 @@ AppSession create_app(const AppCreateConfig& config)
     auto services = app["services"];
     static const std::string mongo_service_name = "BackingDB";
 
-    auto create_mongo_service_resp = services.post_json({
-        {"name", mongo_service_name},
-        {"type", "mongodb"},
-        {"config",
-         {
-             {"uri", config.mongo_uri},
-             {"sync",
-              {
-                  {"state", "enabled"},
-                  {"database_name", config.mongo_dbname},
-                  {"partition",
-                   {
-                       {"key", config.partition_key.name},
-                       {"type", property_type_to_bson_type_str(config.partition_key.type)},
-                       {"required", false},
-                       {"permissions",
-                        {
-                            {"read", true},
-                            {"write", true},
-                        }},
-                   }},
-              }},
-         }},
-    });
+    nlohmann::json mongo_service_def = {{"name", mongo_service_name},
+                                        {"type", "mongodb"},
+                                        {"config",
+                                         {
+                                             {"uri", config.mongo_uri},
+                                         }}};
+
+    if (config.query_based_sync_enabled) {
+        mongo_service_def["config"]["sync_query"] =
+            nlohmann::json{{"state", "enabled"}, {"database_name", config.mongo_dbname}};
+    }
+    else {
+        mongo_service_def["config"]["sync"] = nlohmann::json{
+            {"state", "enabled"},
+            {"database_name", config.mongo_dbname},
+            {"partition",
+             {
+                 {"key", config.partition_key.name},
+                 {"type", property_type_to_bson_type_str(config.partition_key.type)},
+                 {"required", false},
+                 {"permissions",
+                  {
+                      {"read", true},
+                      {"write", true},
+                  }},
+             }},
+        };
+    }
+
+    auto create_mongo_service_resp = services.post_json(std::move(mongo_service_def));
 
     std::string mongo_service_id = create_mongo_service_resp["_id"];
     auto rules = services[mongo_service_id]["rules"];

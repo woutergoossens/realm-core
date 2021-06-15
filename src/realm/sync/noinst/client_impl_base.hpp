@@ -83,6 +83,7 @@ private:
     using SaltedFileIdent = sync::SaltedFileIdent;
     using ClientError = sync::Client::Error;
 
+    const bool m_query_based_sync_enabled;
     const ReconnectMode m_reconnect_mode; // For testing purposes only
     const milliseconds_type m_connect_timeout;
     const milliseconds_type m_connection_linger_time;
@@ -129,6 +130,7 @@ public:
     milliseconds_type ping_keepalive_period = sync::Client::default_ping_keepalive_period;
     milliseconds_type pong_keepalive_timeout = sync::Client::default_pong_keepalive_timeout;
     milliseconds_type fast_reconnect_limit = sync::Client::default_fast_reconnect_limit;
+    bool enable_query_based_sync = false;
     bool disable_upload_activation_delay = false;
     bool dry_run = false;
     bool tcp_no_delay = false;
@@ -286,6 +288,9 @@ public:
     /// than or equal to get_oldest_supported_protocol_version(), and be less
     /// than or equal to sync::get_current_protocol_version().
     int get_negotiated_protocol_version() noexcept;
+
+    /// Returns whether this connection is configured for query based sync.
+    bool query_based_sync_enabled() const noexcept;
 
     // Overriding methods in util::websocket::Config
     util::Logger& websocket_get_logger() noexcept override;
@@ -522,6 +527,7 @@ private:
                                salt_type server_version_salt, uint_fast64_t begin_offset, uint_fast64_t end_offset,
                                uint_fast64_t max_offset, BinaryData chunk);
     void receive_download_message(session_ident_type, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
+                                  sync::query_version_type query_version, bool is_last_in_batch,
                                   const ReceivedChangesets&);
     void receive_mark_message(session_ident_type, request_ident_type);
     void receive_alloc_message(session_ident_type, file_ident_type file_ident);
@@ -1057,6 +1063,9 @@ private:
 
     std::int_fast32_t m_num_outstanding_subtier_allocations = 0;
 
+    // If QBS is enabled, this will be the query currently active for this session.
+    util::Optional<std::string> m_qbs_query;
+
     util::Optional<sync::Session::Config::ClientReset> m_client_reset_config = util::none;
 
     static std::string make_logger_prefix(session_ident_type);
@@ -1101,6 +1110,7 @@ private:
     void receive_state_message(version_type server_version, salt_type server_version_salt, uint_fast64_t begin_offset,
                                uint_fast64_t end_offset, uint_fast64_t max_offset, BinaryData chunk);
     void receive_download_message(const SyncProgress&, std::uint_fast64_t downloadable_bytes,
+                                  sync::query_version_type query_version, bool is_last_in_batch,
                                   const ReceivedChangesets&);
     std::error_code receive_mark_message(request_ident_type);
     std::error_code receive_alloc_message(file_ident_type file_ident);
@@ -1125,6 +1135,7 @@ private:
 /// (other than `sync_transact_reporter`).
 class ClientImplBase::Session::Config {
 public:
+    util::Optional<std::string> query;
     SyncTransactReporter* sync_transact_reporter = nullptr;
     bool disable_upload = false;
     bool disable_empty_upload = false;
@@ -1212,6 +1223,11 @@ inline auto ClientImplBase::Connection::get_client_protocol() noexcept -> Client
 inline int ClientImplBase::Connection::get_negotiated_protocol_version() noexcept
 {
     return m_negotiated_protocol_version;
+}
+
+inline bool ClientImplBase::Connection::query_based_sync_enabled() const noexcept
+{
+    return m_client.m_query_based_sync_enabled;
 }
 
 inline ClientImplBase::Connection::~Connection() {}
@@ -1426,7 +1442,11 @@ inline ClientImplBase::Session::Session(Connection& conn, session_ident_type ide
     , m_disable_upload{config.disable_upload}
     , m_disable_empty_upload{config.disable_empty_upload}
     , m_is_subserver{config.is_subserver}
+    , m_qbs_query(std::move(config.query))
 {
+    // Either QBS must be disabled, or we should have a query defined.
+    REALM_ASSERT((!get_client().m_query_based_sync_enabled || m_qbs_query));
+
     if (get_client().m_disable_upload_activation_delay)
         m_allow_upload = true;
 }

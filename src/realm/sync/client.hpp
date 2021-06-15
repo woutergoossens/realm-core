@@ -211,6 +211,10 @@ public:
         ///
         /// Testing/debugging feature. Should never be enabled in production.
         bool disable_sync_to_disk = false;
+
+        /// When true, connections from this client will use the query-based-sync
+        /// protocol to communicate with the server.
+        bool enable_query_based_sync = false;
     };
 
     /// \throw util::EventLoop::Implementation::NotAvailable if no event loop
@@ -378,7 +382,20 @@ public:
         /// specified path as part of the file system path of a Realm file.
         /// On the MongoDB Realm-based Sync server, virtual paths are not coupled
         /// to file system paths, and thus, these restrictions do not apply.
+        // TODO what do we do with this in the QBS world?
         std::string realm_identifier = "";
+
+        // TODO we need more sophisticated of the query-based-sync query. For now though,
+        // this should be a string containing an XJSON string containing a map of table
+        // names to MQL queries like this:
+        // {
+        //   "People": {"name": "Joe"},
+        //   "Pets": {"type":{"$in":["dog", "cat"]}},
+        //   "Hobbies": {"name":{"$ne": "golf"}}
+        // }
+        //
+        // If QBS is disabled in the client, this must be empty.
+        util::Optional<std::string> query;
 
         /// The protocol used for communicating with the server. See
         /// ProtocolEnvelope.

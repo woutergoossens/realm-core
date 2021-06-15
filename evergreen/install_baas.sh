@@ -90,7 +90,9 @@ REALPATH=$BASE_PATH/abspath.sh
 usage()
 {
     echo "Usage: install_baas.sh -w <path to working dir>
-                       [-b <branch or git spec of baas to checkout/build]"
+                       [-b <branch or git spec of baas to checkout/build]
+                       [-r <path to github repo. defaults to 10gen/baas>]
+                       [-n]"
     exit 0
 }
 
@@ -98,6 +100,8 @@ PASSED_ARGUMENTS=$(getopt w:s:b: "$*") || usage
 
 WORK_PATH=""
 BAAS_VERSION=""
+CLEAN_CONFIG="yes"
+BAAS_REPO="10gen/baas"
 
 set -- $PASSED_ARGUMENTS
 while :
@@ -105,6 +109,8 @@ do
     case "$1" in
         -w) WORK_PATH=$($REALPATH "$2"); shift; shift;;
         -b) BAAS_VERSION="$2"; shift; shift;;
+        -n) CLEAN_CONFIG="no"; shift;;
+        -r) BAAS_REPO="$2"; shift; shift;;
         --) shift; break;;
         *) echo "Unexpected option $1"; usage;;
     esac
@@ -150,7 +156,7 @@ if [[ -z "$BAAS_VERSION" ]]; then
 fi
 
 if [[ ! -d $WORK_PATH/baas/.git ]]; then
-    git clone git@github.com:10gen/baas.git
+    git clone git@github.com:$BAAS_REPO.git baas
 else
     cd baas
     git fetch
@@ -217,10 +223,13 @@ fi
 
 ulimit -n 32000
 
-if [[ -d mongodb-dbpath ]]; then
+
+if [[ -d mongodb-dbpath && "$CLEAN_CONFIG" = "yes" ]]; then
     rm -rf mongodb-dbpath
 fi
-mkdir mongodb-dbpath
+if [[ ! -d mongodb-dbpath ]]; then
+    mkdir mongodb-dbpath
+fi
 
 function cleanup() {
     if [[ -f $WORK_PATH/baas_server.pid ]]; then
@@ -252,24 +261,28 @@ echo "Starting mongodb"
     --dbpath $WORK_PATH/mongodb-dbpath/ \
     --pidfilepath $WORK_PATH/mongod.pid &
 
-./mongodb-binaries/bin/mongo \
-    --nodb \
-    --eval 'assert.soon(function(x){try{var d = new Mongo("localhost:26000"); return true}catch(e){return false}}, "timed out connecting")' \
-> /dev/null
+if [[ "$CLEAN_CONFIG" = "yes" ]]; then
+    ./mongodb-binaries/bin/mongo \
+        --nodb \
+        --eval 'assert.soon(function(x){try{var d = new Mongo("localhost:26000"); return true}catch(e){return false}}, "timed out connecting")' \
+    > /dev/null
 
-echo "Initializing replica set"
-./mongodb-binaries/bin/mongo --port 26000 --eval 'rs.initiate()' > /dev/null
+    echo "Initializing replica set"
+    ./mongodb-binaries/bin/mongo --port 26000 --eval 'rs.initiate()' > /dev/null
+
+    cd $WORK_PATH/baas
+    echo "Adding stitch user"
+    go run -exec="env LD_LIBRARY_PATH=$LD_LIBRARY_PATH" cmd/auth/user.go \
+        addUser \
+        -domainID 000000000000000000000000 \
+        -mongoURI mongodb://localhost:26000 \
+        -salt 'DQOWene1723baqD!_@#'\
+        -id "unique_user@domain.com" \
+        -password "password"
+    cd -
+fi
 
 cd $WORK_PATH/baas
-echo "Adding stitch user"
-go run -exec="env LD_LIBRARY_PATH=$LD_LIBRARY_PATH" cmd/auth/user.go \
-    addUser \
-    -domainID 000000000000000000000000 \
-    -mongoURI mongodb://localhost:26000 \
-    -salt 'DQOWene1723baqD!_@#'\
-    -id "unique_user@domain.com" \
-    -password "password"
-
 [[ -d tmp ]] || mkdir tmp
 echo "Starting stitch app server"
 [[ -f $WORK_PATH/baas_server.pid ]] && rm $WORK_PATH/baas_server.pid
