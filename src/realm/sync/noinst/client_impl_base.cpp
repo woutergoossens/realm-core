@@ -2709,10 +2709,6 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
         bool good_file_ident =
             (changeset.origin_file_ident > 0 && changeset.origin_file_ident != m_client_file_ident.ident);
 
-        // TODO this is broken, needs to be fixed for QBS.
-        if (query_based_sync_enabled && !good_file_ident && changeset.origin_file_ident == 1) {
-            good_file_ident = true;
-        }
         if (!good_file_ident) {
             logger.error("Bad origin file identifier");
             m_conn.close_due_to_protocol_error(ClientError::bad_origin_file_ident);
