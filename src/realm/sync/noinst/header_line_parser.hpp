@@ -28,6 +28,15 @@ inline util::StringView parse_header_value(util::StringView sv, T&& cur_arg)
     return sv.substr(parse_res.ptr - sv.begin());
 }
 
+inline util::StringView parse_header_value(util::StringView sv, bool& cur_arg)
+{
+    int bool_value = 0;
+    auto ret = parse_header_value(sv, bool_value);
+
+    cur_arg = (bool_value != 0);
+    return ret;
+}
+
 inline util::StringView parse_header_value(util::StringView sv, util::StringView& cur_arg)
 {
     auto delim_at = std::find(sv.begin(), sv.end(), ' ');
