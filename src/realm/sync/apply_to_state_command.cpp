@@ -8,9 +8,11 @@
 #include "realm/sync/changeset_parser.hpp"
 #include "realm/sync/noinst/compression.hpp"
 #include "realm/util/cli_args.hpp"
+#include "realm/util/file.hpp"
 #include "realm/util/from_chars.hpp"
 #include "realm/util/load_file.hpp"
 #include "realm/util/safe_int_ops.hpp"
+#include "realm/util/scope_exit.hpp"
 #include "realm/util/string_view.hpp"
 
 #include <external/mpark/variant.hpp>
@@ -295,6 +297,8 @@ void print_usage(StringView program_name)
                  "                       Realm file.\n"
                  "  -r, --realm          The file-system path to the realm to be created and/or have\n"
                  "                       state applied to.\n"
+                 "  --temp-realm         Apply the messages to a temporary realm that gets cleaned deleted\n"
+                 "                       when the program exits\n"
                  "  -i, --input          The file-system path a file containing UPLOAD, DOWNLOAD,\n"
                  "                       and IDENT messages to apply to the realm state\n"
                  "  --verbose            Print all messages including trace messages to stderr\n"
@@ -311,6 +315,7 @@ int main(int argc, const char** argv)
     CliArgument encryption_key_arg(arg_parser, "encryption-key", 'e');
     CliArgument input_arg(arg_parser, "input", 'i');
     CliFlag verbose_arg(arg_parser, "verbose");
+    CliFlag temp_realm_arg(arg_parser, "temp-realm");
     auto arg_results = arg_parser.parse(argc, argv);
 
     std::unique_ptr<RootLogger> logger = std::make_unique<StderrLogger>(); // Throws
@@ -326,7 +331,7 @@ int main(int argc, const char** argv)
         return EXIT_SUCCESS;
     }
 
-    if (!realm_arg) {
+    if (!realm_arg && !temp_realm_arg) {
         logger->error("missing path to realm to apply changesets to");
         print_usage(arg_results.program_name);
         return EXIT_FAILURE;
@@ -336,7 +341,22 @@ int main(int argc, const char** argv)
         print_usage(arg_results.program_name);
         return EXIT_FAILURE;
     }
-    auto realm_path = realm_arg.as<std::string>();
+
+    std::string realm_path;
+    std::string temp_realm_dir;
+    if (!temp_realm_arg) {
+        realm_path = realm_arg.as<std::string>();
+    }
+    else {
+        temp_realm_dir = realm::util::make_temp_dir();
+        realm_path = realm::util::format("%1/default.realm", temp_realm_dir);
+    }
+    auto temp_dir_cleanup = realm::util::make_scope_exit([&]() noexcept {
+        if (temp_realm_dir.empty()) {
+            return;
+        }
+        realm::util::remove_dir_recursive(temp_realm_dir);
+    });
 
     std::string encryption_key;
     if (encryption_key_arg) {
