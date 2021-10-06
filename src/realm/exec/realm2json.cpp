@@ -8,6 +8,7 @@ const char* legend =
     "\n"
     "Options:\n"
     " --schema: Just output the schema of the realm\n"
+    " --class <class_name>: Just output a specific class\n"
     " --link-depth: How deep to traverse linking objects (use -1 for infinite). See test_json.cpp "
     "for more details. Defaults to 0.\n"
     " --output-mode: Optional formatting for the output \n"
@@ -41,6 +42,7 @@ void abort_if(bool cond, FormatStr fmt, Args... args)
 int main(int argc, char const* argv[])
 {
     std::map<std::string, std::string> renames;
+    std::string table_name;
     size_t link_depth = 0;
     bool output_schema = false;
     realm::JSONOutputMode output_mode = realm::output_mode_json;
@@ -55,6 +57,9 @@ int main(int argc, char const* argv[])
         }
         else if (arg == "--link-depth") {
             link_depth = strtol(argv[++idx], nullptr, 0);
+        }
+        else if (arg == "--class") {
+            table_name = argv[++idx];
         }
         else if (arg == "--output-mode") {
             auto output_mode_val = strtol(argv[++idx], nullptr, 0);
@@ -88,6 +93,10 @@ int main(int argc, char const* argv[])
         realm::Group g(path);
         if (output_schema) {
             g.schema_to_json(std::cout, &renames);
+        }
+        else if (!table_name.empty()) {
+            auto table = g.get_table(table_name);
+            table->to_json(std::cout, link_depth, renames, output_mode);
         }
         else {
             g.to_json(std::cout, link_depth, &renames, output_mode);

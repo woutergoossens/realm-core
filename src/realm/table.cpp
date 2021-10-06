@@ -2696,7 +2696,7 @@ void Table::to_json(std::ostream& out, size_t link_depth, const std::map<std::st
                     JSONOutputMode output_mode) const
 {
     // Represent table as list of objects
-    out << "[";
+    out << "[\n";
     bool first = true;
 
     for (auto& obj : *this) {
@@ -2704,12 +2704,12 @@ void Table::to_json(std::ostream& out, size_t link_depth, const std::map<std::st
             first = false;
         }
         else {
-            out << ",";
+            out << ",\n";
         }
         obj.to_json(out, link_depth, renames, output_mode);
     }
 
-    out << "]";
+    out << "\n]";
 }
 
 

@@ -1046,15 +1046,24 @@ bool compare_tables(const Table& table_1, const Table& table_2, util::Logger& lo
 }
 
 
-bool compare_groups(const Transaction& group_1, const Transaction& group_2)
+bool compare_groups(const Group& group_1, const Group& group_2)
 {
     MuteLogger logger;
     return compare_groups(group_1, group_2, logger);
 }
 
+bool compare_groups(const Group& group_1, const Group& group_2, util::Logger& logger)
+{
+    return compare_groups(
+        group_1, group_2,
+        [](StringData) {
+            return true;
+        },
+        logger);
+}
 
-bool compare_groups(const Transaction& group_1, const Transaction& group_2,
-                    std::function<bool(StringData)> filter_func, util::Logger& logger)
+bool compare_groups(const Group& group_1, const Group& group_2, std::function<bool(StringData)> filter_func,
+                    util::Logger& logger)
 {
     auto filter = [&](const Group& group, std::vector<StringData>& tables) {
         auto table_keys = group.get_table_keys();

@@ -120,6 +120,13 @@ install(FILES ../../external/json/json.hpp
         DESTINATION include/external/json
         COMPONENT devel)
 
+add_executable(ApplyFromLog apply_from_log.cpp)
+set_target_properties(ApplyFromLog PROPERTIES
+                      OUTPUT_NAME "realm-apply-from_log"
+                      DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
+target_link_libraries(ApplyFromLog Sync Storage)
+
+
 if(REALM_BUILD_COMMANDLINE_TOOLS)
     add_executable(DumpCommand dump_command.cpp)
     set_target_properties(DumpCommand PROPERTIES
