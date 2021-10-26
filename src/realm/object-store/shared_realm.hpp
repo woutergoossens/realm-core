@@ -26,6 +26,7 @@
 #include <realm/db.hpp>
 #include <realm/version_id.hpp>
 
+#include <iostream>
 #include <memory>
 
 namespace realm {
@@ -549,6 +550,8 @@ public:
         , m_path(std::move(path))
         , m_underlying(std::move(underlying))
     {
+        std::cout << "Failed to open " << path << ": " << message << "\n";
+        util::Backtrace::capture().print(std::cout);
     }
     Kind kind() const
     {
