@@ -14,7 +14,7 @@
 -----------
 
 ### Internals
-* None.
+* The client file UUID has been removed as it was no longer being used for anything.
 
 ----------------------------------------------
 
