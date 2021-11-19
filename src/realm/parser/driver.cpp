@@ -848,7 +848,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
     std::string explain_value_message = text;
     switch (type) {
         case Type::NUMBER: {
-            if (hint == type_Decimal) {
+            if (hint == type_Decimal || hint == type_Mixed) {
                 ret = std::make_unique<Value<Decimal128>>(Decimal128(text));
             }
             else {
@@ -862,6 +862,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                     ret = std::make_unique<Value<float>>(strtof(text.c_str(), nullptr));
                     break;
                 }
+                case type_Mixed:
                 case type_Decimal:
                     ret = std::make_unique<Value<Decimal128>>(Decimal128(text));
                     break;
@@ -884,6 +885,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                     ret = std::make_unique<Value<double>>(negative ? -inf : inf);
                     break;
                 }
+                case type_Mixed:
                 case type_Decimal:
                     ret = std::make_unique<Value<Decimal128>>(Decimal128(text));
                     break;
@@ -901,6 +903,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                 case type_Double:
                     ret = std::make_unique<Value<double>>(type_punning<double>(0x7ff8000000000000));
                     break;
+                case type_Mixed:
                 case type_Decimal:
                     ret = std::make_unique<Value<Decimal128>>(Decimal128::nan("0"));
                     break;

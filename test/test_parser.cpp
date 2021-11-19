@@ -2461,10 +2461,12 @@ TEST(Parser_list_of_primitive_mixed)
     numeric_list.add(Mixed{Decimal128(2.2)});
     numeric_list.add(Mixed{float(3.3f)});
     numeric_list.add(Mixed{double(4.4)});
+    const auto numeric_sum = Decimal128(1) + Decimal128(2.2) + Decimal128(3.3f) + Decimal128(4.4);
+    const auto numeric_average = numeric_sum / 4;
     CHECK_EQUAL(numeric_list.min(), Mixed{1});
     CHECK_EQUAL(numeric_list.max(), Mixed{4.4});
-    CHECK_EQUAL(numeric_list.sum(), Mixed{10.9});
-    CHECK_EQUAL(numeric_list.avg(), Mixed{2.725});
+    CHECK_EQUAL(numeric_list.sum(), numeric_sum);
+    CHECK_EQUAL(numeric_list.avg(), numeric_average);
 
     Obj obj_with_strings = t->create_object();
     auto strings_list = obj_with_strings.get_list<Mixed>(col_list);
@@ -2494,10 +2496,15 @@ TEST(Parser_list_of_primitive_mixed)
     mixed_list.add(Mixed{null::get_null_float<double>()});
     mixed_list.add(Mixed{Decimal128{realm::null()}});
     mixed_list.add(Mixed{Decimal128{StringData{}}}); // NaN
+    const auto mixed_sum = Decimal128(1) + Decimal128(2.5) + Decimal128(3.7f);
+    const auto mixed_average = mixed_sum / 3;
     CHECK_EQUAL(mixed_list.min(), Mixed(false));
     CHECK_EQUAL(mixed_list.max(), Mixed(UUID()));
-    CHECK_EQUAL(mixed_list.sum(), Mixed(7.2));
-    CHECK_EQUAL(mixed_list.avg(), Mixed(2.4));
+    CHECK_EQUAL(mixed_list.sum(), mixed_sum);
+    CHECK_EQUAL(mixed_list.avg(), mixed_average);
+
+    Any boxed_numeric_sum = numeric_sum, boxed_numeric_average = numeric_average;
+    Any boxed_mixed_sum = mixed_sum, boxed_mixed_average = mixed_average;
 
     verify_query(test_context, t, "values.@count == 0", 1);
     verify_query(test_context, t, "values.@size == 1", 2);
@@ -2516,15 +2523,15 @@ TEST(Parser_list_of_primitive_mixed)
     verify_query(test_context, t, "values.@sum > 0", 3);
     verify_query(test_context, t, "values.@sum == 0", 4);
     verify_query(test_context, t, "values.@sum == 3", 1);
-    verify_query(test_context, t, "values.@sum == 10.9", 1);
-    verify_query(test_context, t, "values.@sum == 7.2", 1);
+    verify_query_sub(test_context, t, "values.@sum == $0", &boxed_numeric_sum, 1, 1);
+    verify_query_sub(test_context, t, "values.@sum == $0", &boxed_mixed_sum, 1, 1);
     verify_query(test_context, t, "values.@avg == 1", 1);
-    verify_query(test_context, t, "values.@avg == 2.725", 1);
-    verify_query(test_context, t, "values.@avg == 2.4", 1);
+    verify_query_sub(test_context, t, "values.@avg == $0", &boxed_numeric_average, 1, 1);
+    verify_query_sub(test_context, t, "values.@avg == $0", &boxed_mixed_average, 1, 1);
     verify_query(test_context, t, "values.@min == false", 1);
     verify_query(test_context, t, "values.@min == 1", 1);
     verify_query(test_context, t, "values.@max == 2", 1);
-    verify_query(test_context, t, "values.@max == 4.4", 1);
+    verify_query(test_context, t, "values.@max == 4.4000000000000004", 1);
     verify_query(test_context, t, "values.@max == uuid(00000000-0000-0000-0000-000000000000)", 1);
 }
 

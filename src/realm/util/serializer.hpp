@@ -39,6 +39,7 @@ class Timestamp;
 class LinkMap;
 class UUID;
 class TypeOfValue;
+class Decimal128;
 enum class ExpressionComparisonType : unsigned char;
 
 namespace util {
@@ -74,6 +75,8 @@ template <>
 std::string print_value<>(realm::UUID);
 template <>
 std::string print_value<>(realm::TypeOfValue);
+template <>
+std::string print_value<>(realm::Decimal128);
 
 // General implementation for most types
 template <typename T>

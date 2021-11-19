@@ -19,7 +19,7 @@
 #include <realm/decimal128.hpp>
 
 #include <realm/string_data.hpp>
-#include <realm/util/to_string.hpp>
+#include <realm/util/serializer.hpp>
 
 #include <external/IntelRDFPMathLib20U2/LIBRARY/src/bid_conf.h>
 #include <external/IntelRDFPMathLib20U2/LIBRARY/src/bid_functions.h>
@@ -55,7 +55,7 @@ Decimal128::Decimal128(double val)
 {
     unsigned flags = 0;
     BID_UINT128 tmp;
-    bid128_from_string(&tmp, util::to_string(val).data(), &flags);
+    bid128_from_string(&tmp, util::serializer::print_value(val).data(), &flags);
     memcpy(this, &tmp, sizeof(*this));
 }
 

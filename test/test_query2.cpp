@@ -947,31 +947,30 @@ TEST(Query_SumMinMaxAvg)
 
     std::vector<ObjKey> keys;
     t.create_objects(9, keys);
-    t.get_object(keys[0]).set_all(1, Timestamp{200, 0}, 1.0f, 2.0, Decimal128{1.1}, Mixed{Decimal128{1.0}});
-    t.get_object(keys[1]).set_all(1, Timestamp{100, 0}, 1.0f, 1.0, Decimal128{2.2}, Mixed{1.0f});
-    t.get_object(keys[2]).set_all(1, Timestamp{100, 0}, 1.0f, 1.0, Decimal128{3.3}, Mixed{2.2f});
-    t.get_object(keys[3]).set_all(1, Timestamp{100, 0}, 1.0f, 1.0, Decimal128{4.4}, Mixed{Decimal128{2.2}});
-    t.get_object(keys[4]).set_all(2, Timestamp{300, 0}, 3.0f, 3.0, Decimal128{5.5}, Mixed{StringData("foo")});
-    t.get_object(keys[5]).set_all(3, Timestamp{50, 0}, 5.0f, 5.0, Decimal128{6.6}, Mixed{Timestamp()});
-    t.get_object(keys[6]).set_all(0, Timestamp{100, 0}, 1.0f, 1.0, Decimal128{7.7}, Mixed{});
-    t.get_object(keys[7]).set_all(0, Timestamp{3000, 0}, 30.0f, 30.0, Decimal128{8.8}, Mixed{42});
-    t.get_object(keys[8]).set_all(0, Timestamp{5, 0}, 0.5f, 0.5, Decimal128{9.9}, Mixed{0.1});
+    t.get_object(keys[0]).set_all(1, Timestamp{200, 0}, 1.0f, 2.0, Decimal128{"1.1"}, Mixed{Decimal128{1.0}});
+    t.get_object(keys[1]).set_all(1, Timestamp{100, 0}, 1.0f, 1.0, Decimal128{"2.2"}, Mixed{1.0f});
+    t.get_object(keys[2]).set_all(1, Timestamp{100, 0}, 1.0f, 1.0, Decimal128{"3.3"}, Mixed{2.2f});
+    t.get_object(keys[3]).set_all(1, Timestamp{100, 0}, 1.0f, 1.0, Decimal128{"4.4"}, Mixed{Decimal128{"2.2"}});
+    t.get_object(keys[4]).set_all(2, Timestamp{300, 0}, 3.0f, 3.0, Decimal128{"5.5"}, Mixed{StringData("foo")});
+    t.get_object(keys[5]).set_all(3, Timestamp{50, 0}, 5.0f, 5.0, Decimal128{"6.6"}, Mixed{Timestamp()});
+    t.get_object(keys[6]).set_all(0, Timestamp{100, 0}, 1.0f, 1.0, Decimal128{"7.7"}, Mixed{});
+    t.get_object(keys[7]).set_all(0, Timestamp{3000, 0}, 30.0f, 30.0, Decimal128{"8.8"}, Mixed{42});
+    t.get_object(keys[8]).set_all(0, Timestamp{5, 0}, 0.5f, 0.5, Decimal128{"9.9"}, Mixed{0.1});
 
     CHECK_EQUAL(9, t.where().sum_int(int_col));
 
     CHECK_EQUAL(0, t.where().minimum_int(int_col));
     CHECK_EQUAL(3, t.where().maximum_int(int_col));
-    CHECK_EQUAL(Decimal128{9.9}, t.where().maximum_decimal128(decimal_col));
+    CHECK_EQUAL(Decimal128{"9.9"}, t.where().maximum_decimal128(decimal_col));
     CHECK_EQUAL(Mixed{"foo"}, t.where().maximum_mixed(mixed_col));
-    CHECK_EQUAL(Decimal128{1.1}, t.where().minimum_decimal128(decimal_col));
+    CHECK_EQUAL(Decimal128{"1.1"}, t.where().minimum_decimal128(decimal_col));
     CHECK_EQUAL(Mixed{0.1}, t.where().minimum_mixed(mixed_col));
-    CHECK_EQUAL(Decimal128{49.5}, t.where().sum_decimal128(decimal_col));
-    CHECK_EQUAL(Mixed{48.5}, t.where().sum_mixed(mixed_col));
-    CHECK_EQUAL(Decimal128{49.5 / 9}, t.where().average_decimal128(decimal_col));
+    CHECK_EQUAL(Decimal128{"49.5"}, t.where().sum_decimal128(decimal_col));
+    CHECK_EQUAL(Mixed{Decimal128{"48.50000004768371581"}}, t.where().sum_mixed(mixed_col));
+    CHECK_EQUAL(Decimal128{"49.5"} / 9, t.where().average_decimal128(decimal_col));
     Decimal128 avg_mixed = t.where().average_mixed(mixed_col);
-    Decimal128 expected_avg_mixed = Decimal128{48.5 / 6};
-    Decimal128 allowed_epsilon{0.001};
-    CHECK(avg_mixed <= (expected_avg_mixed + allowed_epsilon) && avg_mixed >= (expected_avg_mixed - allowed_epsilon));
+    Decimal128 expected_avg_mixed = (Decimal128{1} + Decimal128{1.0f} + Decimal128{2.2f} + Decimal128{"2.2"} + Decimal128{42} + Decimal128{0.1}) / 6;
+    CHECK_EQUAL(expected_avg_mixed, avg_mixed);
     t.get_object(keys[6]).set<Mixed>(mixed_col, Mixed{false});
     CHECK_EQUAL(Mixed{false}, t.where().minimum_mixed(mixed_col));
 

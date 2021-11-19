@@ -19,6 +19,7 @@
 #include <realm/util/serializer.hpp>
 
 #include <realm/binary_data.hpp>
+#include <realm/decimal128.hpp>
 #include <realm/keys.hpp>
 #include <realm/null.hpp>
 #include <realm/query_expression.hpp>
@@ -196,6 +197,12 @@ template <>
 std::string print_value<>(realm::TypeOfValue type)
 {
     return '"' + type.to_string() + '"';
+}
+
+template <>
+std::string print_value<>(realm::Decimal128 value)
+{
+    return value.to_string();
 }
 
 // The variable name must be unique with respect to the already chosen variables at
