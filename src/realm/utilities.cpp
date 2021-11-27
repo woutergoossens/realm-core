@@ -311,6 +311,22 @@ int gettimeofday(struct timeval* tp, struct timezone* tzp)
     tp->tv_usec = (long)(system_time.wMilliseconds * 1000);
     return 0;
 }
+
+std::wstring string_to_wstring(const std::string& str)
+{
+    if (str.empty())
+        return std::wstring();
+    int wstr_size = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
+    std::wstring wstr;
+    if (wstr_size) {
+        wstr.resize(wstr_size);
+        if (MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, &wstr[0], wstr_size)) {
+            return wstr;
+        }
+    }
+    return std::wstring();
+}
+
 #endif
 
 int64_t platform_timegm(tm time)

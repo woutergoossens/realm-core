@@ -8,33 +8,11 @@
 #include <sys/stat.h>
 #endif
 
+#include <realm/utilities.hpp>
 #include <realm/util/file.hpp>
 #include <realm/util/file_is_regular.hpp>
 
 using namespace realm;
-
-#ifdef _WIN32
-
-namespace {
-
-std::wstring string_to_wstring(const std::string& str)
-{
-    if (str.empty())
-        return std::wstring();
-    int wstr_size = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
-    std::wstring wstr;
-    if (wstr_size) {
-        wstr.resize(wstr_size); // Throws
-        if (MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, &wstr[0], wstr_size))
-            return wstr;
-    }
-    return std::wstring();
-}
-
-} // unnamed namespace
-
-#endif // defined _WIN32
-
 
 bool util::file_is_regular(const std::string& path)
 {

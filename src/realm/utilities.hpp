@@ -128,6 +128,7 @@ void millisleep(unsigned long milliseconds);
 
 #ifdef _WIN32
 int gettimeofday(struct timeval* tp, struct timezone* tzp);
+std::wstring string_to_wstring(const std::string& str);
 #endif
 
 int64_t platform_timegm(tm time);

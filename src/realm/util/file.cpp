@@ -48,6 +48,7 @@
 #include <realm/util/string_buffer.hpp>
 #include <realm/util/features.h>
 #include <realm/util/file.hpp>
+#include <realm/utilities.hpp>
 
 using namespace realm;
 using namespace realm::util;
@@ -73,21 +74,6 @@ std::string get_last_error_msg(const char* prefix, DWORD err)
     buffer.resize(offset);
     buffer.append_c_str("Unknown error");
     return buffer.str();
-}
-
-std::wstring string_to_wstring(const std::string& str)
-{
-    if (str.empty())
-        return std::wstring();
-    int wstr_size = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
-    std::wstring wstr;
-    if (wstr_size) {
-        wstr.resize(wstr_size);
-        if (MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, &wstr[0], wstr_size)) {
-            return wstr;
-        }
-    }
-    return std::wstring();
 }
 
 #endif
