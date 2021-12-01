@@ -41,7 +41,7 @@ public:
     FLXSyncTestHarness(const std::string& test_name, ServerSchema server_schema = default_server_schema());
 
     template <typename Func>
-    void do_with_new_realm(Func&& func)
+    void do_with_new_realm(Func&& func) const
     {
         auto sync_mgr = make_sync_manager();
         auto creds = create_user_and_log_in(sync_mgr.app());
@@ -50,8 +50,55 @@ public:
         func(Realm::get_shared_realm(config));
     }
 
+    struct ReusableRealmInfo {
+        ~ReusableRealmInfo()
+        {
+            // if (!base_path.empty()) {
+            //     util::remove_dir_recursive(base_path);
+            // }
+        }
+
+        std::string base_path;
+        AutoVerifiedEmailCredentials credentials;
+        SyncTestFile test_file;
+    };
+
     template <typename Func>
-    void load_initial_data(Func&& func)
+    ReusableRealmInfo do_with_reusable_realm(util::Optional<ReusableRealmInfo> realm_info, Func&& func) const
+    {
+        TestSyncManager::Config tsm_config(m_app_config);
+        auto base_path = realm_info ? std::move(realm_info->base_path) : util::make_temp_dir();
+        tsm_config.base_path = base_path;
+        tsm_config.override_sync_route = false;
+        tsm_config.should_teardown_test_directory = false;
+        auto sync_mgr = make_sync_manager(std::move(tsm_config));
+        AutoVerifiedEmailCredentials creds;
+        if (realm_info) {
+            sync_mgr.app()->log_in_with_credentials(
+                realm_info->credentials, [](std::shared_ptr<SyncUser>, util::Optional<app::AppError> error) {
+                    REQUIRE_FALSE(error);
+                });
+            creds = realm_info->credentials;
+        }
+        else {
+            creds = create_user_and_log_in(sync_mgr.app());
+        }
+
+        auto config = realm_info
+                          ? realm_info->test_file
+                          : SyncTestFile(sync_mgr.app()->current_user(), schema(), SyncConfig::FLXSyncEnabled{});
+        if (realm_info) {
+            config.sync_config->user = sync_mgr.app()->current_user();
+        }
+        else {
+            config.persist();
+        }
+        func(Realm::get_shared_realm(config));
+        return ReusableRealmInfo{base_path, creds, std::move(config)};
+    }
+
+    template <typename Func>
+    void load_initial_data(Func&& func) const
     {
         do_with_new_realm([&](SharedRealm realm) {
             {
@@ -67,7 +114,7 @@ public:
         });
     }
 
-    TestSyncManager make_sync_manager();
+    TestSyncManager make_sync_manager(util::Optional<TestSyncManager::Config> config = util::none) const;
 
     const Schema& schema() const
     {
@@ -116,11 +163,12 @@ FLXSyncTestHarness::FLXSyncTestHarness(const std::string& test_name, ServerSchem
 {
 }
 
-TestSyncManager FLXSyncTestHarness::make_sync_manager()
+TestSyncManager FLXSyncTestHarness::make_sync_manager(util::Optional<TestSyncManager::Config> config) const
 {
-    TestSyncManager::Config smc(m_app_config);
-    smc.verbose_sync_client_logging = true;
-    return TestSyncManager(std::move(smc), {});
+    app::App::clear_cached_apps();
+    auto tsm_config = config.value_or(TestSyncManager::Config(m_app_config));
+    tsm_config.verbose_sync_client_logging = true;
+    return TestSyncManager(std::move(tsm_config), {});
 }
 
 TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
@@ -145,14 +193,13 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
         realm->commit_transaction();
         wait_for_upload(*realm);
     });
-    harness.do_with_new_realm([&](SharedRealm realm) {
+    auto realm_info = harness.do_with_reusable_realm(util::none, [&](SharedRealm realm) {
         auto table = realm->read_group().get_table("class_TopLevel");
         Query new_query_a(table);
         auto col_key = table->get_column_key("queryable_str_field");
         new_query_a.equal(col_key, "foo");
         {
             auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
-            new_query_a.equal(col_key, "foo");
             new_subs.insert_or_assign(new_query_a);
             new_subs.commit();
             new_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
@@ -166,6 +213,47 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
             CHECK(obj.is_valid());
             CHECK(obj.get<ObjectId>("_id") == foo_obj_id);
         }
+    });
+
+    auto bizz_obj_id = ObjectId::gen();
+    harness.do_with_new_realm([&](SharedRealm realm) {
+        auto table = realm->read_group().get_table("class_TopLevel");
+        Query new_query_a(table);
+        auto col_key = table->get_column_key("queryable_str_field");
+        {
+            auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
+            new_query_a.equal(col_key, "foo");
+            new_subs.insert_or_assign(new_query_a);
+            new_subs.commit();
+            new_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+        }
+
+        realm->begin_transaction();
+        CppContext c(realm);
+        Object::create(c, realm, "TopLevel",
+                       util::Any(AnyDict{{"_id", bizz_obj_id},
+                                         {"queryable_str_field", std::string{"foo"}},
+                                         {"queryable_int_field", static_cast<int64_t>(15)},
+                                         {"non_queryable_field", std::string{"non queryable 3"}}}));
+        realm->commit_transaction();
+        wait_for_upload(*realm);
+        wait_for_download(*realm);
+    });
+
+    harness.do_with_reusable_realm(std::move(realm_info), [&](SharedRealm realm) {
+        auto table = realm->read_group().get_table("class_TopLevel");
+        Query new_query_a(table);
+        wait_for_download(*realm);
+
+        Results results(realm, new_query_a);
+        CHECK(results.size() == 2);
+        auto obj = results.get<Obj>(0);
+        CHECK(obj.is_valid());
+        CHECK(obj.get<ObjectId>("_id") == foo_obj_id);
+
+        obj = results.get<Obj>(1);
+        CHECK(obj.is_valid());
+        CHECK(obj.get<ObjectId>("_id") == bizz_obj_id);
     });
 }
 
