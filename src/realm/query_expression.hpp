@@ -2794,12 +2794,17 @@ public:
         m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(column);
     }
 
+    Columns<Dictionary>& key(Mixed key_value)
+    {
+        init_key(key_value);
+        return *this;
+    }
+
     DataType get_key_type() const
     {
         return m_key_type;
     }
 
-    ColumnDictionaryKey key(const Mixed& key_value);
     ColumnDictionaryKeys keys();
 
     SizeOperator<int64_t> size() override;
@@ -2811,6 +2816,17 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override;
 
+    std::string description(util::serializer::SerialisationState& state) const override
+    {
+        std::string key_string;
+        if (!m_key.is_null()) {
+            std::ostringstream ostr;
+            ostr << m_key;
+            key_string = '[' + ostr.str() + ']';
+        }
+        return ColumnListBase::description(state) + key_string;
+    }
+
     std::unique_ptr<Subexpr> clone() const override
     {
         return make_subexpr<Columns<Dictionary>>(*this);
@@ -2819,53 +2835,15 @@ public:
     Columns(Columns const& other)
         : ColumnsCollection<Mixed>(other)
         , m_key_type(other.m_key_type)
-    {
-    }
-
-protected:
-    DataType m_key_type;
-};
-
-class ColumnDictionaryKey : public Columns<Dictionary> {
-public:
-    ColumnDictionaryKey(Mixed key_value, const Columns<Dictionary>& dict)
-        : Columns<Dictionary>(dict)
-    {
-        init_key(key_value);
-    }
-
-    ColumnDictionaryKey& property(const std::string& prop)
-    {
-        m_prop_list.push_back(prop);
-        return *this;
-    }
-
-    void evaluate(size_t index, ValueBase& destination) override;
-
-    std::string description(util::serializer::SerialisationState& state) const override
-    {
-        std::ostringstream ostr;
-        ostr << m_key;
-        return ColumnListBase::description(state) + '[' + ostr.str() + ']';
-    }
-
-    std::unique_ptr<Subexpr> clone() const override
-    {
-        return std::unique_ptr<Subexpr>(new ColumnDictionaryKey(*this));
-    }
-
-    ColumnDictionaryKey(ColumnDictionaryKey const& other)
-        : Columns<Dictionary>(other)
-        , m_prop_list(other.m_prop_list)
         , m_objkey(other.m_objkey)
     {
         init_key(other.m_key);
     }
 
-private:
+protected:
+    DataType m_key_type;
     Mixed m_key;
     std::string m_buffer;
-    std::vector<std::string> m_prop_list;
     ObjKey m_objkey;
 
     void init_key(Mixed key_value);

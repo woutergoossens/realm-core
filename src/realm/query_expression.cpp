@@ -251,32 +251,9 @@ std::vector<ObjKey> LinkMap::get_origin_ndxs(ObjKey key, size_t column) const
     return ret;
 }
 
-ColumnDictionaryKey Columns<Dictionary>::key(const Mixed& key_value)
-{
-    if (m_key_type != type_Mixed && key_value.get_type() != m_key_type) {
-        throw LogicError(LogicError::collection_type_mismatch);
-    }
-
-    return ColumnDictionaryKey(key_value, *this);
-}
-
 ColumnDictionaryKeys Columns<Dictionary>::keys()
 {
     return ColumnDictionaryKeys(*this);
-}
-
-void ColumnDictionaryKey::init_key(Mixed key_value)
-{
-    REALM_ASSERT(!key_value.is_null());
-
-    m_key = key_value;
-    if (!key_value.is_null()) {
-        if (m_key.get_type() == type_String) {
-            m_buffer = std::string(m_key.get_string());
-            m_key = Mixed(m_buffer);
-        }
-        m_objkey = Dictionary::get_internal_obj_key(m_key);
-    }
 }
 
 void ColumnDictionaryKeys::set_cluster(const Cluster* cluster)
@@ -345,64 +322,6 @@ void ColumnDictionaryKeys::evaluate(size_t index, ValueBase& destination)
     }
 }
 
-void ColumnDictionaryKey::evaluate(size_t index, ValueBase& destination)
-{
-    if (links_exist()) {
-        REALM_ASSERT(m_leaf_ptr == nullptr);
-        std::vector<ObjKey> links = m_link_map.get_links(index);
-        auto sz = links.size();
-
-        destination.init_for_links(m_link_map.only_unary_links(), sz);
-        for (size_t t = 0; t < sz; t++) {
-            const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
-            auto dict = obj.get_dictionary(m_column_key);
-            Mixed val;
-            if (auto opt_val = dict.try_get(m_key)) {
-                val = *opt_val;
-                if (m_prop_list.size()) {
-                    if (val.is_type(type_TypedLink)) {
-                        auto obj = get_base_table()->get_parent_group()->get_object(val.get<ObjLink>());
-                        val = obj.get_any(m_prop_list.begin(), m_prop_list.end());
-                    }
-                    else {
-                        val = {};
-                    }
-                }
-            }
-            destination.set(t, val);
-        }
-    }
-    else {
-        // Not a link column
-        Allocator& alloc = get_base_table()->get_alloc();
-
-        REALM_ASSERT(m_leaf_ptr != nullptr);
-        if (m_leaf_ptr->get(index)) {
-            DictionaryClusterTree dict_cluster(static_cast<Array*>(m_leaf_ptr), m_key_type, alloc, index);
-            dict_cluster.init_from_parent();
-
-            Mixed val;
-            auto state = dict_cluster.try_get_with_key(m_objkey, m_key);
-            if (state.index != realm::npos) {
-                ArrayMixed values(alloc);
-                ref_type ref = to_ref(Array::get(state.mem.get_addr(), 2));
-                values.init_from_ref(ref);
-                val = values.get(state.index);
-                if (m_prop_list.size()) {
-                    if (val.is_type(type_TypedLink)) {
-                        auto obj = get_base_table()->get_parent_group()->get_object(val.get<ObjLink>());
-                        val = obj.get_any(m_prop_list.begin(), m_prop_list.end());
-                    }
-                    else {
-                        val = {};
-                    }
-                }
-            }
-            destination.set(0, val);
-        }
-    }
-}
-
 class DictionarySize : public Columns<Dictionary> {
 public:
     DictionarySize(const Columns<Dictionary>& other)
@@ -428,6 +347,15 @@ public:
     }
 };
 
+void Columns<Dictionary>::init_key(Mixed key_value)
+{
+    m_key = key_value;
+    if (!key_value.is_null()) {
+        m_key.use_buffer(m_buffer);
+        m_objkey = Dictionary::get_internal_obj_key(m_key);
+    }
+}
+
 SizeOperator<int64_t> Columns<Dictionary>::size()
 {
     std::unique_ptr<Subexpr> ptr(new DictionarySize(*this));
@@ -446,10 +374,19 @@ void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
         for (size_t t = 0; t < sz; t++) {
             const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
             auto dict = obj.get_dictionary(m_column_key);
-            // Insert all values
-            dict.for_all_values([&values](const Mixed& value) {
-                values.emplace_back(value);
-            });
+            if (m_objkey) {
+                Mixed val;
+                if (auto opt_val = dict.try_get(m_key)) {
+                    val = *opt_val;
+                }
+                values.emplace_back(val);
+            }
+            else {
+                // Insert all values
+                dict.for_all_values([&values](const Mixed& value) {
+                    values.emplace_back(value);
+                });
+            }
         }
 
         // Copy values over
@@ -465,20 +402,33 @@ void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
             DictionaryClusterTree dict_cluster(static_cast<Array*>(m_leaf_ptr), m_key_type, alloc, index);
             dict_cluster.init_from_parent();
 
-            destination.init(true, dict_cluster.size());
-            ArrayMixed leaf(alloc);
-            size_t n = 0;
-            // Iterate through cluster and insert all values
-            dict_cluster.traverse([&leaf, &destination, &n](const Cluster* cluster) {
-                size_t e = cluster->node_size();
-                cluster->init_leaf(DictionaryClusterTree::s_values_col, &leaf);
-                for (size_t i = 0; i < e; i++) {
-                    destination.set(n, leaf.get(i));
-                    n++;
+            if (m_objkey) {
+                Mixed val;
+                auto state = dict_cluster.try_get_with_key(m_objkey, m_key);
+                if (state.index != realm::npos) {
+                    ArrayMixed values(alloc);
+                    ref_type ref = to_ref(Array::get(state.mem.get_addr(), 2));
+                    values.init_from_ref(ref);
+                    val = values.get(state.index);
                 }
-                // Continue
-                return false;
-            });
+                destination.set(0, val);
+            }
+            else {
+                destination.init(true, dict_cluster.size());
+                ArrayMixed leaf(alloc);
+                size_t n = 0;
+                // Iterate through cluster and insert all values
+                dict_cluster.traverse([&leaf, &destination, &n](const Cluster* cluster) {
+                    size_t e = cluster->node_size();
+                    cluster->init_leaf(DictionaryClusterTree::s_values_col, &leaf);
+                    for (size_t i = 0; i < e; i++) {
+                        destination.set(n, leaf.get(i));
+                        n++;
+                    }
+                    // Continue
+                    return false;
+                });
+            }
         }
     }
 }
