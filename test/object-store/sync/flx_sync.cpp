@@ -26,6 +26,9 @@
 #include "util/test_file.hpp"
 
 #include "realm/object-store/impl/object_accessor_impl.hpp"
+#include "realm/object-store/sync/async_open_task.hpp"
+#include "realm/object-store/thread_safe_reference.hpp"
+#include "realm/object-store/shared_realm.hpp"
 
 namespace realm::app {
 
@@ -47,7 +50,21 @@ public:
         auto creds = create_user_and_log_in(sync_mgr.app());
 
         SyncTestFile config(sync_mgr.app()->current_user(), schema(), SyncConfig::FLXSyncEnabled{});
-        func(Realm::get_shared_realm(config));
+
+        auto realm_task = Realm::get_synchronized_realm(config);
+        auto [ promise, future ] = util::make_promise_future<ThreadSafeReference>();
+        auto shared_promise = std::make_shared<decltype(promise)>(std::move(promise));
+        realm_task->start([shared_promise](ThreadSafeReference ref, std::exception_ptr eptr) mutable {
+            if (eptr) {
+                try {
+                    std::rethrow_exception(eptr);
+                } catch(...) {
+                    shared_promise->set_error(exception_to_status());
+                }
+            }
+            shared_promise->emplace_value(std::move(ref));
+        });
+        func(Realm::get_shared_realm(std::move(future.get())));
     }
 
     template <typename Func>
@@ -117,6 +134,7 @@ FLXSyncTestHarness::FLXSyncTestHarness(const std::string& test_name, ServerSchem
 TestSyncManager FLXSyncTestHarness::make_sync_manager()
 {
     TestSyncManager::Config smc(m_app_config);
+    smc.verbose_sync_client_logging= true;
     return TestSyncManager(std::move(smc), {});
 }
 
