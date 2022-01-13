@@ -227,6 +227,9 @@ public:
         return ret;
     }
 
+    Mixed key() const;
+    Mixed value() const;
+
 private:
     friend class Dictionary;
     using ClusterTree::Iterator::get_position;
