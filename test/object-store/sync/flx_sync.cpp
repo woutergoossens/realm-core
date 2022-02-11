@@ -128,6 +128,7 @@ FLXSyncTestHarness::FLXSyncTestHarness(const std::string& test_name, ServerSchem
 TestSyncManager FLXSyncTestHarness::make_sync_manager()
 {
     TestSyncManager::Config smc(m_app_config);
+    smc.verbose_sync_client_logging = true;
     return TestSyncManager(std::move(smc), {});
 }
 
@@ -232,6 +233,79 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
             Results results(realm, table);
             CHECK(results.size() == 0);
         }
+    });
+}
+
+TEST_CASE("flx: RCORE-969", "[sync][flx][app]") {
+    FLXSyncTestHarness::ServerSchema server_schema_config;
+    server_schema_config.schema = Schema{
+        ObjectSchema("TopLevel",
+                     {
+                         {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                         {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+                         {"arr_fld", PropertyType::Array | PropertyType::Int},
+                     }),
+    };
+    server_schema_config.dev_mode_enabled = false;
+    server_schema_config.queryable_fields = {"queryable_int_field"};
+
+    FLXSyncTestHarness harness("RCORE-969", std::move(server_schema_config));
+
+    auto obj_id = ObjectId::gen();
+    harness.load_initial_data([&](SharedRealm realm) {
+        CppContext c(realm);
+        realm->begin_transaction();
+        Object::create(c, realm, "TopLevel",
+                       util::Any(AnyDict{{"_id", obj_id},
+                                         {"queryable_int_field", static_cast<int64_t>(5)},
+                                         {"arr_fld", std::vector<util::Any>{int64_t(1)}}}));
+        Object::create(c, realm, "TopLevel",
+                       util::Any(AnyDict{{"_id", ObjectId::gen()},
+                                         {"queryable_int_field", static_cast<int64_t>(10)},
+                                         {"arr_fld", std::vector<util::Any>{int64_t(2)}}}));
+        realm->commit_transaction();
+        wait_for_upload(*realm);
+    });
+
+    harness.do_with_new_realm([&](SharedRealm realm) {
+        auto table = realm->read_group().get_table("class_TopLevel");
+        auto key = table->get_column_key("queryable_int_field");
+        auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
+        new_subs.insert_or_assign(Query(table).greater(key, int64_t(5)));
+        std::move(new_subs).commit();
+        wait_for_upload(*realm);
+        wait_for_download(*realm);
+
+        new_subs = realm->get_latest_subscription_set().make_mutable_copy();
+        new_subs.clear();
+        new_subs.insert_or_assign(Query(table));
+        std::move(new_subs).commit();
+
+        CppContext c(realm);
+        realm->begin_transaction();
+        Object::create(c, realm, "TopLevel",
+                       util::Any(AnyDict{{"_id", obj_id},
+                                         {"queryable_int_field", static_cast<int64_t>(5)},
+                                         {"arr_fld", std::vector<util::Any>{int64_t(3)}}}));
+        realm->commit_transaction();
+
+        wait_for_upload(*realm);
+    });
+
+    harness.do_with_new_realm([&](SharedRealm realm) {
+        auto table = realm->read_group().get_table("class_TopLevel");
+        auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
+        new_subs.insert_or_assign(Query(table));
+        std::move(new_subs).commit();
+        wait_for_upload(*realm);
+        wait_for_download(*realm);
+
+        realm->refresh();
+        Results res(realm, Query(table).equal(table->get_column_key("_id"), obj_id));
+        CHECK(res.size() == 1);
+        auto obj = res.get<Obj>(0);
+        auto list = obj.get_list<int64_t>("arr_fld");
+        CHECK(list.get(0) == 1);
     });
 }
 
