@@ -399,6 +399,60 @@ TEST(Unresolved_PrimaryKeyInt)
     CHECK_EQUAL(obj.get<ObjKey>(col), lazarus.get_key());
 }
 
+ONLY(Unresolved_Collections)
+{
+    Group g;
+
+    auto source_table = g.add_table_with_primary_key("source", type_Int, "source_id");
+    auto dest_table = g.add_table_with_primary_key("dest", type_Int, "dest_id");
+    auto linklist_col = source_table->add_column_list(*dest_table, "linklist");
+    auto linkset_col = source_table->add_column_set(*dest_table, "linkset");
+    auto list_mixed_col = source_table->add_column_list(type_Mixed, "list of mixed");
+    auto set_of_mixed_col = source_table->add_column_set(type_Mixed, "set of mixed");
+
+    auto source_obj = source_table->create_object_with_primary_key(0);
+    auto dest_obj = dest_table->create_object_with_primary_key(1);
+
+    LnkLst linklist = source_obj.get_linklist(linklist_col);
+    Lst<Mixed> list_mixed = source_obj.get_list<Mixed>(list_mixed_col);
+    LnkSet linkset = source_obj.get_linkset(linkset_col);
+    Set<Mixed> set_mixed = source_obj.get_set<Mixed>(set_of_mixed_col);
+
+    linklist.add(dest_obj.get_key());
+    list_mixed.add(ObjLink{dest_table->get_key(), dest_obj.get_key()});
+    linkset.insert(dest_obj.get_key());
+    set_mixed.insert(ObjLink{dest_table->get_key(), dest_obj.get_key()});
+
+    size_t expected_size = 1;
+    CHECK_EQUAL(linklist.size(), expected_size);
+    CHECK_EQUAL(linkset.size(), expected_size);
+    CHECK_EQUAL(list_mixed.size(), expected_size);
+    CHECK_EQUAL(set_mixed.size(), expected_size);
+
+    dest_obj.invalidate(); // send to graveyard, and transform all incoming links to be unresolved
+
+    expected_size = 0;
+    CHECK_EQUAL(linklist.size(), expected_size);
+    CHECK_EQUAL(linkset.size(), expected_size);
+    CHECK_EQUAL(list_mixed.size(), expected_size); // fails
+    CHECK_EQUAL(set_mixed.size(), expected_size);  // fails
+
+    // lnklst and lnkset have hidden their unresolved link correctly
+    // but list<Mixed> and set<Mixed> size() says there is one link still, what is it?
+
+    auto check_mixed_link = [&](Mixed link) {
+        CHECK(link.is_null());               // fails
+        CHECK(link.is_type(type_TypedLink)); // this means there is a valid link here
+        ObjLink objlink = link.get<ObjLink>();
+        CHECK(objlink.is_null());        // fails
+        CHECK(!objlink.is_unresolved()); // oops we have exposed an unresolved link to users
+    };
+    auto link = list_mixed.get(0);
+    check_mixed_link(link);
+    link = set_mixed.get(0);
+    check_mixed_link(link);
+}
+
 TEST(Unresolved_GarbageCollect)
 {
     Group g;
