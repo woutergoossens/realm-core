@@ -1252,9 +1252,9 @@ std::unique_ptr<DescriptorOrdering> DescriptorOrderingNode::visit(ParserDriver* 
         }
         else {
             bool is_distinct = cur_ordering->get_type() == DescriptorNode::DISTINCT;
-            std::vector<std::vector<SortableColumnKey>> property_columns;
+            std::vector<std::vector<ExtendedColumnKey>> property_columns;
             for (auto& col_names : cur_ordering->columns) {
-                std::vector<SortableColumnKey> columns;
+                std::vector<ExtendedColumnKey> columns;
                 LinkChain link_chain(target);
                 for (size_t ndx_in_path = 0; ndx_in_path < col_names.size(); ++ndx_in_path) {
                     std::string path_elem = drv->translate(link_chain, col_names[ndx_in_path]);
