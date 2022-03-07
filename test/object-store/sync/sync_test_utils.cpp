@@ -131,21 +131,26 @@ ExpectedRealmPaths::ExpectedRealmPaths(const std::string& base_path, const std::
     }
     std::string clean_name = name ? util::make_percent_encoded_string(*name) : cleaned_partition;
     std::string cleaned_app_id = util::make_percent_encoded_string(app_id);
-    std::string manager_path = util::format("%1mongodb-realm/%2/", base_path, cleaned_app_id);
-    std::string preferred_name = util::format("%1%2/%3", manager_path, identity, clean_name);
-    current_preferred_path = util::format("%1.realm", preferred_name);
-    fallback_hashed_path = util::format("%1%2.realm", manager_path, do_hash(preferred_name));
-
-    legacy_sync_directories_to_make.push_back(util::format("%1%2", manager_path, local_identity));
+    std::string manager_path = fs::path{base_path + "/mongodb-realm/" + cleaned_app_id}.make_preferred().string();
+    std::string preferred_name = fs::path{manager_path + "/" + identity + "/" + clean_name}.make_preferred().string();
+    current_preferred_path = fs::path{preferred_name + ".realm"}.make_preferred().string();
+    fallback_hashed_path =
+        fs::path{manager_path + "/" + do_hash(preferred_name) + ".realm"}.make_preferred().string();
+    legacy_sync_directories_to_make.push_back(
+        fs::path{manager_path + "/" + local_identity}.make_preferred().string());
     std::string encoded_partition = util::make_percent_encoded_string(partition);
-    legacy_local_id_path = util::format("%1%2/%3.realm", manager_path, local_identity,
-                                        name ? util::make_percent_encoded_string(*name) : encoded_partition);
-    std::string dir_builder = util::format("%1realm-object-server", manager_path);
+    legacy_local_id_path = fs::path{manager_path + "/" + local_identity + "/" +
+                                    (name ? util::make_percent_encoded_string(*name) : encoded_partition) + ".realm"}
+                               .make_preferred()
+                               .string();
+    auto dir_builder = fs::path{manager_path + "/realm-object-server"}.make_preferred().string();
     legacy_sync_directories_to_make.push_back(dir_builder);
-    dir_builder = util::format("%1/%2", dir_builder, local_identity);
+    dir_builder = fs::path{dir_builder + "/" + local_identity}.make_preferred().string();
     legacy_sync_directories_to_make.push_back(dir_builder);
     legacy_sync_path =
-        util::format("%1/%2", dir_builder, name ? util::make_percent_encoded_string(*name) : cleaned_partition);
+        fs::path{dir_builder + "/" + (name ? util::make_percent_encoded_string(*name) : cleaned_partition)}
+            .make_preferred()
+            .string();
 }
 
 #if REALM_ENABLE_SYNC
@@ -320,96 +325,6 @@ struct FakeLocalClientReset : public TestClientReset {
 };
 
 #if REALM_ENABLE_SYNC
-
-struct TestServerClientReset : public TestClientReset {
-    TestServerClientReset(const Realm::Config& local_config, const Realm::Config& remote_config,
-                          TestSyncManager& test_sync_manager)
-        : TestClientReset(local_config, remote_config)
-        , m_test_sync_manager(test_sync_manager)
-    {
-    }
-
-    void run() override
-    {
-        m_did_run = true;
-        using namespace std::literals::chrono_literals;
-        auto& server = m_test_sync_manager.sync_server();
-        auto sync_manager = m_test_sync_manager.app()->sync_manager();
-        constexpr int64_t pk = 0;
-
-        auto realm = Realm::get_shared_realm(m_local_config);
-        auto session = sync_manager->get_existing_session(realm->config().path);
-        {
-            realm->begin_transaction();
-
-            if (m_on_setup) {
-                m_on_setup(realm);
-            }
-
-            auto obj = create_object(*realm, "object", {pk});
-            auto col = obj.get_table()->get_column_key("value");
-            obj.set(col, 1);
-            obj.set(col, 2);
-            obj.set(col, 3);
-            realm->commit_transaction();
-
-            wait_for_upload(*realm);
-            session->log_out();
-
-            // Make a change while offline so that log compaction will cause a
-            // client reset
-            realm->begin_transaction();
-            obj.set(col, 4);
-            if (m_make_local_changes) {
-                m_make_local_changes(realm);
-            }
-            realm->commit_transaction();
-        }
-
-        // Make writes from another client while advancing the time so that
-        // the server performs log compaction
-        {
-            auto realm2 = Realm::get_shared_realm(m_remote_config);
-            auto session2 = sync_manager->get_existing_session(realm2->config().path);
-
-            for (int i = 0; i < 2; ++i) {
-                wait_for_download(*realm2);
-                realm2->begin_transaction();
-                auto table = get_table(*realm2, "object");
-                auto col = table->get_column_key("value");
-                table->begin()->set(col, i + 5);
-                if (i == 1 && m_make_remote_changes) {
-                    m_make_remote_changes(realm2);
-                }
-                realm2->commit_transaction();
-                wait_for_upload(*realm2);
-                server.advance_clock(10s);
-            }
-            server.advance_clock(10s);
-            realm2->close();
-        }
-
-        // Resuming sync on the first realm should now result in a client reset
-        session->revive_if_needed();
-        if (m_on_post_local) {
-            m_on_post_local(realm);
-        }
-        wait_for_upload(*realm);
-        if (m_on_post_reset) {
-            m_on_post_reset(realm);
-        }
-    }
-
-private:
-    TestSyncManager& m_test_sync_manager;
-};
-
-std::unique_ptr<TestClientReset> make_test_server_client_reset(const Realm::Config& local_config,
-                                                               const Realm::Config& remote_config,
-                                                               TestSyncManager& test_sync_manager)
-{
-    return std::make_unique<TestServerClientReset>(local_config, remote_config, test_sync_manager);
-}
 
 #if REALM_ENABLE_AUTH_TESTS
 
