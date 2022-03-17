@@ -6,6 +6,7 @@
 
 ### Fixed
 * Fixed a segfault in sync compiled by MSVC 2022. ([#5557](https://github.com/realm/realm-core/pull/5557), since 12.1.0)
+* Fix an error when compiling a watchOS Simulator target on an M1 is not supporting Thread-local storage ([#7694](https://github.com/realm/realm-swift/issues/7694), [#7695](https://github.com/realm/realm-swift/issues/7695) since v11.7.0)
  
 ### Breaking changes
 * None.
