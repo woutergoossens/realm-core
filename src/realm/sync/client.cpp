@@ -28,6 +28,7 @@ using SyncTransactCallback            = Session::SyncTransactCallback;
 using ProgressHandler                 = Session::ProgressHandler;
 using WaitOperCompletionHandler       = Session::WaitOperCompletionHandler;
 using ConnectionStateChangeListener   = Session::ConnectionStateChangeListener;
+using SyncDownloadIntegrationCallback = Session::SyncDownloadIntegrationCallback;
 using port_type                       = Session::port_type;
 using connection_ident_type           = std::int_fast64_t;
 using ProxyConfig                     = SyncConfig::ProxyConfig;
@@ -179,6 +180,8 @@ public:
     void set_sync_transact_handler(util::UniqueFunction<SyncTransactCallback>);
     void set_progress_handler(util::UniqueFunction<ProgressHandler>);
     void set_connection_state_change_listener(util::UniqueFunction<ConnectionStateChangeListener>);
+    void set_download_message_integration_started_handler(util::UniqueFunction<SyncDownloadIntegrationCallback>);
+    void set_download_message_integration_completed_handler(util::UniqueFunction<SyncDownloadIntegrationCallback>);
 
     void initiate();
     void initiate(ProtocolEnvelope, std::string server_address, port_type server_port, std::string virt_path,
@@ -236,6 +239,8 @@ private:
     util::UniqueFunction<SyncTransactCallback> m_sync_transact_handler;
     util::UniqueFunction<ProgressHandler> m_progress_handler;
     util::UniqueFunction<ConnectionStateChangeListener> m_connection_state_change_listener;
+    util::UniqueFunction<SyncDownloadIntegrationCallback> m_download_message_integration_started_handler;
+    util::UniqueFunction<SyncDownloadIntegrationCallback> m_download_message_integration_completed_handler;
 
     std::shared_ptr<SubscriptionStore> m_flx_subscription_store;
     int64_t m_flx_active_version = 0;
@@ -312,6 +317,8 @@ private:
     void on_connection_state_changed(ConnectionState, const SessionErrorInfo*);
     void on_flx_sync_progress(int64_t new_version, DownloadBatchState batch_state);
     void on_flx_sync_error(int64_t version, std::string_view err_msg);
+    void on_download_message_integration_started(size_t num_changesets, DownloadBatchState batch_state);
+    void on_download_message_integration_completed(size_t num_changesets, DownloadBatchState batch_state);
 
     void report_progress();
 
@@ -623,7 +630,6 @@ void ClientImpl::remove_connection(ClientImpl::Connection& conn) noexcept
 }
 
 
-
 // ################ SessionImpl ################
 
 
@@ -742,6 +748,16 @@ SubscriptionStore* SessionImpl::get_flx_subscription_store()
     return m_wrapper.get_flx_subscription_store();
 }
 
+void SessionImpl::on_download_message_integration_started(size_t num_changesets, DownloadBatchState batch_state)
+{
+    m_wrapper.on_download_message_integration_started(num_changesets, batch_state);
+}
+
+void SessionImpl::on_download_message_integration_completed(size_t num_changesets, DownloadBatchState batch_state)
+{
+    m_wrapper.on_download_message_integration_completed(num_changesets, batch_state);
+}
+
 // ################ SessionWrapper ################
 
 SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<SubscriptionStore> flx_sub_store,
@@ -855,6 +871,20 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
     std::move(mut_subs).commit();
 }
 
+void SessionWrapper::on_download_message_integration_started(size_t num_changesets, DownloadBatchState batch_state)
+{
+    if (m_download_message_integration_started_handler) {
+        m_download_message_integration_started_handler(num_changesets, batch_state);
+    }
+}
+
+void SessionWrapper::on_download_message_integration_completed(size_t num_changesets, DownloadBatchState batch_state)
+{
+    if (m_download_message_integration_completed_handler) {
+        m_download_message_integration_completed_handler(num_changesets, batch_state);
+    }
+}
+
 SubscriptionStore* SessionWrapper::get_flx_subscription_store()
 {
     return m_flx_subscription_store.get();
@@ -880,6 +910,22 @@ SessionWrapper::set_connection_state_change_listener(util::UniqueFunction<Connec
 {
     REALM_ASSERT(!m_initiated);
     m_connection_state_change_listener = std::move(listener);
+}
+
+
+inline void SessionWrapper::set_download_message_integration_started_handler(
+    util::UniqueFunction<SyncDownloadIntegrationCallback> handler)
+{
+    REALM_ASSERT(!m_initiated);
+    m_download_message_integration_started_handler = std::move(handler);
+}
+
+
+inline void SessionWrapper::set_download_message_integration_completed_handler(
+    util::UniqueFunction<SyncDownloadIntegrationCallback> handler)
+{
+    REALM_ASSERT(!m_initiated);
+    m_download_message_integration_completed_handler = std::move(handler);
 }
 
 
@@ -1105,8 +1151,8 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
         conn.update_connect_info(m_http_request_path_prefix, m_signed_access_token);      // Throws
         std::unique_ptr<SessionImpl> sess_2 = std::make_unique<SessionImpl>(*this, conn); // Throws
         SessionImpl& sess = *sess_2;
-        sess.logger.detail("Binding '%1' to '%2'", m_db->get_path(), m_virt_path);       // Throws
-        conn.activate_session(std::move(sess_2));                                        // Throws
+        sess.logger.detail("Binding '%1' to '%2'", m_db->get_path(), m_virt_path); // Throws
+        conn.activate_session(std::move(sess_2));                                  // Throws
 
         m_actualized = true;
         m_sess = &sess;
@@ -1504,6 +1550,20 @@ void Session::set_progress_handler(util::UniqueFunction<ProgressHandler> handler
 void Session::set_connection_state_change_listener(util::UniqueFunction<ConnectionStateChangeListener> listener)
 {
     m_impl->set_connection_state_change_listener(std::move(listener)); // Throws
+}
+
+
+void Session::set_download_message_integration_started_callback(
+    util::UniqueFunction<SyncDownloadIntegrationCallback> handler)
+{
+    m_impl->set_download_message_integration_started_handler(std::move(handler)); // Throws
+}
+
+
+void Session::set_download_message_integration_completed_callback(
+    util::UniqueFunction<SyncDownloadIntegrationCallback> handler)
+{
+    m_impl->set_download_message_integration_completed_handler(std::move(handler)); // Throws
 }
 
 

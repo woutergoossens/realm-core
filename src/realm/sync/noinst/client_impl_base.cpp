@@ -1012,7 +1012,7 @@ void Connection::read_or_write_error(std::error_code ec)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::read_or_write_error;
     bool is_fatal = false;
-    close_due_to_client_side_error(ec, is_fatal);     // Throws
+    close_due_to_client_side_error(ec, is_fatal); // Throws
 }
 
 
@@ -1117,7 +1117,7 @@ void Connection::disconnect(std::error_code ec, bool is_fatal, StringData* custo
 
     SessionErrorInfo error_info{ec, is_fatal, detailed_message};
     report_connection_state_change(ConnectionState::disconnected, &error_info); // Throws
-    initiate_reconnect_wait();                     // Throws
+    initiate_reconnect_wait();                                                  // Throws
 }
 
 bool Connection::is_flx_sync_connection() const noexcept
@@ -1642,8 +1642,8 @@ void Session::send_bind_message()
     // Discard the token since it's ignored by the server.
     std::string empty_access_token{};
     protocol.make_bind_message(protocol_version, out, session_ident, path, empty_access_token, need_client_file_ident,
-                               is_subserver);                           // Throws
-    m_conn.initiate_write_message(out, this);                           // Throws
+                               is_subserver); // Throws
+    m_conn.initiate_write_message(out, this); // Throws
 
     m_bind_message_sent = true;
 
@@ -1688,7 +1688,7 @@ void Session::send_ident_message()
                      m_progress.latest_server_version.salt);                                  // Throws
         protocol.make_pbs_ident_message(out, session_ident, m_client_file_ident, m_progress); // Throws
     }
-    m_conn.initiate_write_message(out, this);                                         // Throws
+    m_conn.initiate_write_message(out, this); // Throws
 
     m_ident_message_sent = true;
 
@@ -2072,7 +2072,9 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
         update_progress(progress); // Throws
     }
 
+    on_download_message_integration_started(received_changesets.size(), batch_state);
     initiate_integrate_changesets(downloadable_bytes, batch_state, received_changesets); // Throws
+    on_download_message_integration_completed(received_changesets.size(), batch_state);
     on_flx_sync_progress(query_version, batch_state);
 
     // When we receive a DOWNLOAD message successfully, we can clear the backoff timer value used to reconnect
@@ -2261,7 +2263,7 @@ void Session::update_progress(const SyncProgress& progress)
 }
 
 
-bool ClientImpl::Session::check_received_sync_progress(const SyncProgress& progress, int& error_code) noexcept
+bool Session::check_received_sync_progress(const SyncProgress& progress, int& error_code) noexcept
 {
     const SyncProgress& a = m_progress;
     const SyncProgress& b = progress;

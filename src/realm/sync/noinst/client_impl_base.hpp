@@ -61,7 +61,7 @@ public:
     class Session;
 
     using port_type = util::network::Endpoint::port_type;
-    using OutputBuffer         = util::ResettableExpandableBufferOutputStream;
+    using OutputBuffer = util::ResettableExpandableBufferOutputStream;
     using ClientProtocol = _impl::ClientProtocol;
     using ClientResetOperation = _impl::ClientResetOperation;
 
@@ -861,6 +861,9 @@ private:
     void on_flx_sync_error(int64_t version, std::string_view err_msg);
     void on_flx_sync_progress(int64_t version, DownloadBatchState batch_state);
 
+    void on_download_message_integration_started(size_t num_changesets, DownloadBatchState batch_state);
+    void on_download_message_integration_completed(size_t num_changesets, DownloadBatchState batch_state);
+
     void begin_resumption_delay();
     void clear_resumption_delay_state();
 
@@ -895,12 +898,12 @@ private:
     // These are reset when the session is activated, and again whenever the
     // connection is lost or the rebinding process is initiated.
     bool m_enlisted_to_send;
-    bool m_bind_message_sent;                   // Sending of BIND message has been initiated
-    bool m_ident_message_sent;                  // Sending of IDENT message has been initiated
-    bool m_unbind_message_sent;                 // Sending of UNBIND message has been initiated
-    bool m_unbind_message_sent_2;               // Sending of UNBIND message has been completed
-    bool m_error_message_received;              // Session specific ERROR message received
-    bool m_unbound_message_received;            // UNBOUND message received
+    bool m_bind_message_sent;        // Sending of BIND message has been initiated
+    bool m_ident_message_sent;       // Sending of IDENT message has been initiated
+    bool m_unbind_message_sent;      // Sending of UNBIND message has been initiated
+    bool m_unbind_message_sent_2;    // Sending of UNBIND message has been completed
+    bool m_error_message_received;   // Session specific ERROR message received
+    bool m_unbound_message_received; // UNBOUND message received
 
     // True when there is a new FLX sync query we need to send to the server.
     util::Optional<SubscriptionStore::PendingSubscription> m_pending_flx_sub_set;
