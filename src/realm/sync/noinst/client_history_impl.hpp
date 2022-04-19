@@ -456,8 +456,7 @@ public:
     }
 
     // Overriding member functions in realm::Replication
-    version_type prepare_changeset(const char*, size_t, version_type)
-    override final;
+    version_type prepare_changeset(const char*, size_t, version_type) final;
     void finalize_changeset() noexcept override final;
 
     ClientHistory& get_history()
