@@ -369,7 +369,6 @@ private:
     // ServerHistory object.
     mutable util::Optional<Arrays> m_arrays;
 
-    mutable std::vector<char> m_changeset_from_server_owner;
     mutable util::Optional<HistoryEntry> m_changeset_from_server;
 
     util::Optional<BinaryData> m_client_reset_changeset;
@@ -457,7 +456,8 @@ public:
     }
 
     // Overriding member functions in realm::Replication
-    version_type prepare_changeset(const char*, size_t, version_type) override final;
+    version_type prepare_changeset(const char*, size_t, version_type)
+    override final;
     void finalize_changeset() noexcept override final;
 
     ClientHistory& get_history()
