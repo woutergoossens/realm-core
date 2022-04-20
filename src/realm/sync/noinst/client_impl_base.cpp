@@ -2072,9 +2072,7 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
         update_progress(progress); // Throws
     }
 
-    on_download_message_integration_started(received_changesets.size(), batch_state);
     initiate_integrate_changesets(downloadable_bytes, batch_state, received_changesets); // Throws
-    on_download_message_integration_completed(received_changesets.size(), batch_state);
     on_flx_sync_progress(query_version, batch_state);
 
     // When we receive a DOWNLOAD message successfully, we can clear the backoff timer value used to reconnect

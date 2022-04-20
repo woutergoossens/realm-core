@@ -861,9 +861,6 @@ private:
     void on_flx_sync_error(int64_t version, std::string_view err_msg);
     void on_flx_sync_progress(int64_t version, DownloadBatchState batch_state);
 
-    void on_download_message_integration_started(size_t num_changesets, DownloadBatchState batch_state);
-    void on_download_message_integration_completed(size_t num_changesets, DownloadBatchState batch_state);
-
     void begin_resumption_delay();
     void clear_resumption_delay_state();
 

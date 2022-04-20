@@ -52,7 +52,7 @@ enum class SimplifiedProtocolError {
 namespace sync {
 using port_type = std::uint_fast16_t;
 enum class ProtocolError;
-}
+} // namespace sync
 
 SimplifiedProtocolError get_simplified_error(sync::ProtocolError err);
 
@@ -160,6 +160,11 @@ struct SyncConfig {
     ClientResyncMode client_resync_mode = ClientResyncMode::Manual;
     std::function<void(std::shared_ptr<Realm> before_frozen)> notify_before_client_reset;
     std::function<void(std::shared_ptr<Realm> before_frozen, std::shared_ptr<Realm> after)> notify_after_client_reset;
+
+    // Called before each download message is integrated on the sync worker thread. For testing only.
+    std::function<void()> on_before_download_integrated;
+    // Called after each download message is integrated on the sync worker thread. For testing only.
+    std::function<void()> on_after_download_integrated;
 
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);
