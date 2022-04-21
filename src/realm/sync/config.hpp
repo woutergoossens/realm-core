@@ -162,9 +162,9 @@ struct SyncConfig {
     std::function<void(std::shared_ptr<Realm> before_frozen, std::shared_ptr<Realm> after)> notify_after_client_reset;
 
     // Called before each download message is integrated on the sync worker thread. For testing only.
-    std::function<void()> on_before_download_integrated;
+    std::function<void(size_t num_changesets)> on_before_download_integrated;
     // Called after each download message is integrated on the sync worker thread. For testing only.
-    std::function<void()> on_after_download_integrated;
+    std::function<void(size_t num_changesets)> on_after_download_integrated;
 
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);
