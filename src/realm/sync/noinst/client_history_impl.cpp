@@ -349,7 +349,7 @@ void ClientHistory::integrate_server_changesets(const SyncProgress& progress,
                                                 const RemoteChangeset* incoming_changesets,
                                                 std::size_t num_changesets, VersionInfo& version_info,
                                                 DownloadBatchState batch_state, util::Logger& logger,
-                                                SyncTransactReporter* transact_reporter)
+                                                SyncTransactReporter* transact_reporter, bool split_changesets)
 {
     REALM_ASSERT(num_changesets != 0);
 
@@ -383,7 +383,7 @@ void ClientHistory::integrate_server_changesets(const SyncProgress& progress,
     // Maximum number of subsets we split the `incoming_changesets` into.
     // We aim that each subset of changesets has the same number of instructions,
     // but this may not always be possible.
-    auto subsets_to_integrate = std::min(max_number_of_transactions, num_changesets);
+    auto subsets_to_integrate = split_changesets ? std::min(max_number_of_transactions, num_changesets) : 1;
     std::uint_fast64_t instructions_per_subset = static_cast<std::uint_fast64_t>(
         std::ceil(static_cast<double>(incoming_instructions_count) / subsets_to_integrate));
 

@@ -620,6 +620,7 @@ void SyncSession::create_sync_session()
     session_config.proxy_config = m_config.proxy_config;
     session_config.on_before_download_integrated = m_config.on_before_download_integrated;
     session_config.on_after_download_integrated = m_config.on_after_download_integrated;
+    session_config.split_remote_changesets = m_config.split_remote_changesets;
 
     {
         std::string sync_route = m_sync_manager->sync_route();
