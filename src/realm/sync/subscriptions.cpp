@@ -32,6 +32,7 @@
 #include <initializer_list>
 #include <stdexcept>
 
+#include <iostream>
 namespace realm::sync {
 namespace {
 // Schema version history:
@@ -138,9 +139,11 @@ void SubscriptionSet::load_from_database(TransactionRef tr, Obj obj)
 
     m_cur_version = tr->get_version();
     m_version = obj.get_primary_key().get_int();
+    REALM_ASSERT_EX(static_cast<uint64_t>(m_version) < m_cur_version, m_version, m_cur_version);
     m_state = static_cast<State>(obj.get<int64_t>(mgr->m_sub_set_state));
     m_error_str = obj.get<String>(mgr->m_sub_set_error_str);
     m_snapshot_version = static_cast<DB::version_type>(obj.get<int64_t>(mgr->m_sub_set_snapshot_version));
+    std::cout << util::format("load_from_database: %1, %2 (%3)", m_version, m_state, mgr) << std::endl;
     auto sub_list = obj.get_linklist(mgr->m_sub_set_subscriptions);
     m_subs.clear();
     for (size_t idx = 0; idx < sub_list.size(); ++idx) {
@@ -151,6 +154,8 @@ void SubscriptionSet::load_from_database(TransactionRef tr, Obj obj)
 std::shared_ptr<const SubscriptionStore> SubscriptionSet::get_flx_subscription_store() const
 {
     if (auto mgr = m_mgr.lock()) {
+        std::cout << "SubscriptionStore address: " << mgr.get() << " pending: " << mgr->m_pending_notifications.size()
+                  << std::endl;
         return mgr;
     }
     throw std::logic_error("Active SubscriptionSet without a SubscriptionStore");
@@ -327,6 +332,7 @@ void MutableSubscriptionSet::update_state(State new_state, util::Optional<std::s
                     "Cannot supply an error message for a subscription set when state is not Error");
             }
             auto mgr = get_flx_subscription_store(); // Throws
+            std::cout << "update state note size: " << mgr->m_pending_notifications.size() << std::endl;
             m_state = new_state;
             mgr->supercede_prior_to(m_tr, version());
             break;
@@ -404,6 +410,8 @@ util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notificat
     // Otherwise, make a promise/future pair and add it to the list of pending notifications.
     auto [promise, future] = util::make_promise_future<State>();
     mgr->m_pending_notifications.emplace_back(version(), std::move(promise), notify_when);
+    std::cout << "new notification for version: " << version() << " at: " << notify_when
+              << " num notifications: " << mgr->m_pending_notifications.size() << " for: " << mgr.get() << std::endl;
     return std::move(future);
 }
 
@@ -413,17 +421,22 @@ void MutableSubscriptionSet::process_notifications()
     auto new_state = state();
     auto my_version = version();
 
+    std::cout << "process_notifications: ";
     std::list<SubscriptionStore::NotificationRequest> to_finish;
     std::unique_lock<std::mutex> lk(mgr->m_pending_notifications_mutex);
     mgr->m_pending_notifications_cv.wait(lk, [&] {
         return mgr->m_outstanding_requests == 0;
     });
+    std::cout << " lock with size: " << mgr->m_pending_notifications.size() << std::endl;
     for (auto it = mgr->m_pending_notifications.begin(); it != mgr->m_pending_notifications.end();) {
         if ((it->version == my_version && (new_state == State::Error || new_state >= it->notify_when)) ||
             (new_state == State::Complete && it->version < my_version)) {
+            std::cout << "will finish for version : " << it->version << std::endl;
             to_finish.splice(to_finish.end(), mgr->m_pending_notifications, it++);
         }
         else {
+            std::cout << "skipping notification for version : " << it->version << " state: " << new_state
+                      << " min_outstanding: " << mgr->m_min_outstanding_version << std::endl;
             ++it;
         }
     }
@@ -453,6 +466,9 @@ SubscriptionSet MutableSubscriptionSet::commit() &&
         throw std::logic_error("SubscriptionSet is not in a commitable state");
     }
     auto mgr = get_flx_subscription_store(); // Throws
+
+    std::cout << "MutableSubscriptionSet::commit() with not size: " << mgr->m_pending_notifications.size()
+              << std::endl;
 
     if (m_old_state == State::Uncommitted) {
         if (m_state == State::Uncommitted) {
@@ -607,6 +623,11 @@ SubscriptionStore::SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t
     }
 }
 
+SubscriptionStore::~SubscriptionStore()
+{
+    std::cout << "destructing SubscriptionStore " << this << std::endl;
+}
+
 SubscriptionSet SubscriptionStore::get_latest() const
 {
     auto tr = m_db->start_frozen();
@@ -729,10 +750,15 @@ SubscriptionSet SubscriptionStore::get_by_version_impl(int64_t version_id,
 
 void SubscriptionStore::supercede_prior_to(TransactionRef tr, int64_t version_id) const
 {
+    std::cout << "supercede_prior_to: " << version_id << std::endl;
     auto sub_sets = tr->get_table(m_sub_set_table);
+    sub_sets->to_json(std::cout, 2, {});
+    std::cout << "before <<<<<" << std::endl;
     Query remove_query(sub_sets);
     remove_query.less(sub_sets->get_primary_key_column(), version_id);
     remove_query.remove();
+    sub_sets->to_json(std::cout, 2, {});
+    std::cout << "after supercede <<<<" << std::endl;
 }
 
 MutableSubscriptionSet SubscriptionStore::make_mutable_copy(const SubscriptionSet& set) const
@@ -741,7 +767,8 @@ MutableSubscriptionSet SubscriptionStore::make_mutable_copy(const SubscriptionSe
 
     auto sub_sets = new_tr->get_table(m_sub_set_table);
     auto new_pk = sub_sets->maximum_int(sub_sets->get_primary_key_column()) + 1;
-
+    sub_sets->to_json(std::cout, 2, {});
+    std::cout << "new pk of mutable copy " << new_pk << std::endl;
     MutableSubscriptionSet new_set_obj(weak_from_this(), std::move(new_tr),
                                        sub_sets->create_object_with_primary_key(Mixed{new_pk}));
     for (const auto& sub : set) {

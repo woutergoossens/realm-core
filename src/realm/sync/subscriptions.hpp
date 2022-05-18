@@ -286,7 +286,7 @@ using SubscriptionStoreRef = std::shared_ptr<SubscriptionStore>;
 class SubscriptionStore : public std::enable_shared_from_this<SubscriptionStore> {
 public:
     static SubscriptionStoreRef create(DBRef db, util::UniqueFunction<void(int64_t)> on_new_subscription_set);
-
+    ~SubscriptionStore();
     SubscriptionStore(const SubscriptionStore&) = delete;
     SubscriptionStore& operator=(const SubscriptionStore&) = delete;
 

@@ -341,7 +341,8 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
 
     auto realm = Realm::get_shared_realm(interrupted_realm_config);
     auto table = realm->read_group().get_table("class_TopLevel");
-    realm->get_latest_subscription_set().get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+    auto latest_subs = realm->get_latest_subscription_set();
+    latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get(); // hangs!
     wait_for_upload(*realm);
     wait_for_download(*realm);
 
@@ -352,7 +353,7 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
     }
 
     auto active_subs = realm->get_active_subscription_set();
-    auto latest_subs = realm->get_latest_subscription_set();
+    latest_subs = realm->get_latest_subscription_set();
     REQUIRE(active_subs.version() == latest_subs.version());
     REQUIRE(active_subs.version() == int64_t(1));
 }
