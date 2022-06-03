@@ -16,7 +16,7 @@
  *
  **************************************************************************/
 
-#include <realm/db.hpp>
+#include <realm/transaction.hpp>
 
 #include <algorithm>
 #include <atomic>
@@ -2672,212 +2672,6 @@ TransactionRef DB::start_frozen(VersionID version_id)
     return tr;
 }
 
-Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB::TransactStage stage)
-    : Group(alloc)
-    , db(_db)
-    , m_read_lock(rli)
-{
-    bool writable = stage == DB::transact_Writing;
-    m_transact_stage = DB::transact_Ready;
-    set_metrics(db->m_metrics);
-    set_transact_stage(stage);
-    m_alloc.note_reader_start(this);
-    attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable);
-}
-
-void Transaction::close()
-{
-    if (m_transact_stage == DB::transact_Writing) {
-        rollback();
-    }
-    if (m_transact_stage == DB::transact_Reading || m_transact_stage == DB::transact_Frozen) {
-        do_end_read();
-    }
-}
-
-void Transaction::end_read()
-{
-    if (m_transact_stage == DB::transact_Ready)
-        return;
-    if (m_transact_stage == DB::transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
-    do_end_read();
-}
-
-void Transaction::do_end_read() noexcept
-{
-    prepare_for_close();
-    detach();
-
-    // We should always be ensuring that async commits finish before we get here,
-    // but if the fsync() failed or we failed to update the top pointer then
-    // there's not much we can do and we have to just accept that we're losing
-    // those commits.
-    if (m_oldest_version_not_persisted) {
-        REALM_ASSERT(m_async_commit_has_failed);
-        // We need to not release our read lock on m_oldest_version_not_persisted
-        // as that's the version the top pointer is referencing and overwriting
-        // that version will corrupt the Realm file.
-        db->leak_read_lock(*m_oldest_version_not_persisted);
-    }
-    db->release_read_lock(m_read_lock);
-
-    m_alloc.note_reader_end(this);
-    set_transact_stage(DB::transact_Ready);
-    // reset the std::shared_ptr to allow the DB object to release resources
-    // as early as possible.
-    db.reset();
-}
-
-TransactionRef Transaction::freeze()
-{
-    if (m_transact_stage != DB::transact_Reading)
-        throw LogicError(LogicError::wrong_transact_state);
-    auto version = VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
-    return db->start_frozen(version);
-}
-
-TransactionRef Transaction::duplicate()
-{
-    auto version = VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
-    if (m_transact_stage == DB::transact_Reading)
-        return db->start_read(version);
-    if (m_transact_stage == DB::transact_Frozen)
-        return db->start_frozen(version);
-
-    throw LogicError(LogicError::wrong_transact_state);
-}
-
-_impl::History* Transaction::get_history() const
-{
-    if (!m_history) {
-        if (auto repl = db->get_replication()) {
-            switch (m_transact_stage) {
-                case DB::transact_Reading:
-                case DB::transact_Frozen:
-                    if (!m_history_read)
-                        m_history_read = repl->_create_history_read();
-                    m_history = m_history_read.get();
-                    m_history->set_group(const_cast<Transaction*>(this), false);
-                    break;
-                case DB::transact_Writing:
-                    m_history = repl->_get_history_write();
-                    break;
-                case DB::transact_Ready:
-                    break;
-            }
-        }
-    }
-    return m_history;
-}
-
-void Transaction::rollback()
-{
-    // rollback may happen as a consequence of exception handling in cases where
-    // the DB has detached. If so, just back out without trying to change state.
-    // the DB object has already been closed and no further processing is possible.
-    if (!is_attached())
-        return;
-    if (m_transact_stage == DB::transact_Ready)
-        return; // Idempotency
-
-    if (m_transact_stage != DB::transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
-    db->reset_free_space_tracking();
-    if (!holds_write_mutex())
-        db->end_write_on_correct_thread();
-
-    do_end_read();
-}
-
-size_t Transaction::get_commit_size() const
-{
-    size_t sz = 0;
-    if (m_transact_stage == DB::transact_Writing) {
-        sz = m_alloc.get_commit_size();
-    }
-    return sz;
-}
-
-DB::version_type Transaction::commit()
-{
-    if (!is_attached())
-        throw LogicError(LogicError::wrong_transact_state);
-    if (m_transact_stage != DB::transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
-
-    REALM_ASSERT(is_attached());
-
-    // before committing, allow any accessors at group level or below to sync
-    flush_accessors_for_commit();
-
-    DB::version_type new_version = db->do_commit(*this); // Throws
-
-    // We need to set m_read_lock in order for wait_for_change to work.
-    // To set it, we grab a readlock on the latest available snapshot
-    // and release it again.
-    VersionID version_id = VersionID(); // Latest available snapshot
-    DB::ReadLockInfo lock_after_commit;
-    db->grab_read_lock(lock_after_commit, version_id);
-    db->release_read_lock(lock_after_commit);
-
-    db->end_write_on_correct_thread();
-
-    do_end_read();
-    m_read_lock = lock_after_commit;
-
-    return new_version;
-}
-
-void Transaction::commit_and_continue_writing()
-{
-    if (!is_attached())
-        throw LogicError(LogicError::wrong_transact_state);
-    if (m_transact_stage != DB::transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
-
-    REALM_ASSERT(is_attached());
-
-    // before committing, allow any accessors at group level or below to sync
-    flush_accessors_for_commit();
-
-    db->do_commit(*this); // Throws
-
-    // We need to set m_read_lock in order for wait_for_change to work.
-    // To set it, we grab a readlock on the latest available snapshot
-    // and release it again.
-    VersionID version_id = VersionID(); // Latest available snapshot
-    DB::ReadLockInfo lock_after_commit;
-    db->grab_read_lock(lock_after_commit, version_id);
-    db->release_read_lock(m_read_lock);
-    m_read_lock = lock_after_commit;
-    if (Replication* repl = db->get_replication()) {
-        bool history_updated = false;
-        repl->initiate_transact(*this, lock_after_commit.m_version, history_updated); // Throws
-    }
-
-    bool writable = true;
-    remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable); // Throws
-}
-
-void Transaction::initialize_replication()
-{
-    if (m_transact_stage == DB::transact_Writing) {
-        if (Replication* repl = get_replication()) {
-            auto current_version = m_read_lock.m_version;
-            bool history_updated = false;
-            repl->initiate_transact(*this, current_version, history_updated); // Throws
-        }
-    }
-}
-
-Transaction::~Transaction()
-{
-    // Note that this does not call close() - calling close() is done
-    // implicitly by the deleter.
-}
-
-
 TransactionRef DB::start_write(bool nonblocking)
 {
     if (m_fake_read_lock_if_immutable) {
@@ -3280,4 +3074,22 @@ void Transaction::acquire_write_lock()
             db->do_begin_possibly_async_write();
             break;
     }
+}
+
+DisableReplication::DisableReplication(Transaction& t)
+    : m_tr(t)
+    , m_owner(t.get_db())
+    , m_repl(m_owner->get_replication())
+    , m_version(t.get_version())
+{
+    m_owner->set_replication(nullptr);
+    t.get_version();
+    t.m_history = nullptr;
+}
+
+DisableReplication::~DisableReplication()
+{
+    m_owner->set_replication(m_repl);
+    if (m_version != m_tr.get_version())
+        m_tr.initialize_replication();
 }
