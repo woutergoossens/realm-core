@@ -6046,4 +6046,64 @@ TEST(LangBindHelper_SchemaChangeNotification)
     CHECK(handler_called);
 }
 
+TEST(LangBindHelper_FragmentFile)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        DBRef db = DB::create(make_in_realm_history(), path);
+        auto tr = db->start_write();
+        auto t = tr->add_table("the_table");
+        auto c = t->add_column(type_Binary, "str");
+        char w[1000];
+        for (int i = 0; i < 1000; ++i) {
+            w[i] = '0' + (i % 10);
+        }
+        size_t num = 100000;
+        for (size_t j = 0; j < num; ++j) {
+            BinaryData sd(w, 500 + (j % 500));
+            t->create_object().set(c, sd);
+        }
+        tr->commit_and_continue_as_read();
+        size_t free_space, used_space;
+        db->get_stats(free_space, used_space);
+        std::cout << free_space << ", " << used_space << std::endl;
+        tr->promote_to_write();
+        int j = 0;
+        for (auto o : *t) {
+            BinaryData sd(w, j % 500);
+            o.set(c, sd);
+            ++j;
+        }
+        tr->commit_and_continue_as_read();
+        db->get_stats(free_space, used_space);
+        std::cout << free_space << ", " << used_space << std::endl;
+        tr->promote_to_write();
+        j = 0;
+        for (auto o : *t) {
+            BinaryData sd(w, j % 10);
+            o.set(c, sd);
+            ++j;
+        }
+        tr->commit_and_continue_as_read();
+
+        db->get_stats(free_space, used_space);
+        std::cout << free_space << ", " << used_space << std::endl;
+        size_t total = free_space + used_space;
+        NodeTree to_be_moved;
+        while (free_space > 0x4000) {
+            tr->promote_to_write();
+            tr->evacuate(to_be_moved);
+            tr->commit_and_continue_as_read();
+            to_be_moved = tr->get_outliers();
+            db->get_stats(free_space, used_space);
+            total = free_space + used_space;
+            std::cout << "Total: " << total << ",  Free: " << free_space << ", Used: " << used_space << std::endl;
+        }
+    }
+    File f(path);
+    std::cout << "Size : " << f.get_size() << std::endl;
+    DB::create(make_in_realm_history(), path);
+    std::cout << "Size : " << f.get_size() << std::endl;
+}
+
 #endif

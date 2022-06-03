@@ -572,6 +572,7 @@ private:
     ///    9th   History ref          (optional)             4
     ///   10th   History version      (optional)             7
     ///   11th   Sync File Id         (optional)            10
+    ///   12th   Evacuation point     (optional)            22
     ///
     /// </pre>
     ///
@@ -625,6 +626,7 @@ private:
     static constexpr size_t s_hist_ref_ndx = 8;
     static constexpr size_t s_hist_version_ndx = 9;
     static constexpr size_t s_sync_file_id_ndx = 10;
+    static constexpr size_t s_evacuation_point_ndx = 11;
 
     static constexpr size_t s_group_max_size = 11;
 

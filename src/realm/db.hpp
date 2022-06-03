@@ -235,7 +235,6 @@ public:
     /// bound (AKA tethered) snapshot.
     struct BadVersion;
 
-
     /// Transactions are obtained from one of the following 3 methods:
     TransactionRef start_read(VersionID = VersionID());
     TransactionRef start_frozen(VersionID = VersionID());
@@ -274,6 +273,11 @@ public:
 
     /// Get the size of the currently allocated slab area
     size_t get_allocated_size() const;
+
+    void set_evacuation_limit(size_t limit)
+    {
+        m_evacuation_limit = limit;
+    }
 
     /// Compact the database file.
     /// - The method will throw if called inside a transaction.
@@ -468,6 +472,7 @@ private:
     std::shared_ptr<metrics::Metrics> m_metrics;
     std::unique_ptr<AsyncCommitHelper> m_commit_helper;
     bool m_is_sync_agent = false;
+    size_t m_evacuation_limit = size_t(-1);
 
     /// Attach this DB instance to the specified database file.
     ///

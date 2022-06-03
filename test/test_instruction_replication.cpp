@@ -671,3 +671,17 @@ TEST(InstructionReplication_Dictionary)
         CHECK_EQUAL(dict.get("d"), true);
     }
 }
+
+TEST(Upgrade_bug)
+{
+    auto db = DB::create(make_client_replication(), "/home/jed/jed.realm");
+    db->start_write()->commit();
+    db->start_write()->commit();
+    db->start_write()->commit();
+    /*
+        auto tree = db->start_read()->traverse(0x2000000);
+        auto tr = db->start_write();
+        tr->evacuate(tree, 0x2000000);
+        tr->commit();
+    */
+}

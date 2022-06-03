@@ -21,7 +21,28 @@
 
 #include <realm/db.hpp>
 
+
 namespace realm {
+
+struct NodeTree {
+    void cow(Array& parent, size_t limit) const
+    {
+        for (auto elem : children) {
+            Array arr(parent.get_alloc());
+            arr.set_parent(&parent, elem.first);
+            arr.init_from_parent();
+            auto byte_size = Node::get_size_from_header(arr.get_header());
+            if (!elem.second.children.empty())
+                elem.second.cow(arr, limit);
+            if (arr.is_read_only() && (arr.get_ref() + byte_size) > limit) {
+                arr.copy_on_write();
+            }
+        }
+    }
+
+    std::map<size_t, NodeTree> children;
+};
+
 class Transaction : public Group {
 public:
     Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB::TransactStage stage);
@@ -47,6 +68,9 @@ public:
     {
         return m_transact_stage != DB::transact_Ready && db->is_attached();
     }
+
+    NodeTree get_outliers() const;
+    void evacuate(const NodeTree& tree);
 
     /// Get the approximate size of the data that would be written to the file if
     /// a commit were done at this point. The reported size will always be bigger

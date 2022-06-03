@@ -19,6 +19,7 @@
 #include <realm/transaction.hpp>
 
 namespace realm {
+
 void Transaction::check_consistency()
 {
     // For the time being, we only check if asymmetric table are empty
@@ -214,6 +215,72 @@ void Transaction::close()
         do_end_read();
     }
 }
+
+namespace {
+
+template <class F>
+void trv(ref_type ref, Allocator& alloc, std::vector<unsigned>& path, F&& func)
+{
+    MemRef mem(ref, alloc);
+    auto hdr = mem.get_addr();
+    auto sz = Node::get_size_from_header(hdr);
+    auto w = Node::get_width_from_header(hdr);
+    auto wtype = Node::get_wtype_from_header(hdr);
+    auto byte_size = Node::calc_byte_size(wtype, sz, w);
+
+    func(path, ref + byte_size);
+
+    if (Node::get_hasrefs_from_header(hdr)) {
+        path.push_back(0);
+        auto data = Node::get_data_from_header(hdr);
+        for (unsigned n = 0; n < sz; n++) {
+            auto val = get_direct(data, w, n);
+            if (val && !(val & 1)) {
+                path.back() = n;
+                trv(ref_type(val), alloc, path, func);
+            }
+        }
+        path.pop_back();
+    }
+}
+
+} // namespace
+
+auto Transaction::get_outliers() const -> NodeTree
+{
+    std::vector<unsigned> path;
+    NodeTree tree;
+    if (size_t limit = m_top.get_as_ref_or_tagged(s_evacuation_point_ndx).get_as_int()) {
+        trv(m_top.get_ref(), m_top.get_alloc(), path, [&](auto& path, size_t end) {
+            if (end > limit) {
+                auto current_tree = &tree;
+                for (auto i : path) {
+                    current_tree = &current_tree->children[i];
+                }
+            }
+        });
+    }
+    return tree;
+}
+
+void Transaction::evacuate(const NodeTree& tree)
+{
+    if (size_t limit = m_top.get_as_ref_or_tagged(s_evacuation_point_ndx).get_as_int()) {
+        if (auto it = tree.children.find(0); it != tree.children.end()) {
+            it->second.cow(m_table_names, limit);
+        }
+        if (auto it = tree.children.find(1); it != tree.children.end()) {
+            it->second.cow(m_tables, limit);
+        }
+        if (auto it = tree.children.find(8); it != tree.children.end()) {
+            Array arr(m_top.get_alloc());
+            arr.set_parent(&m_top, 8);
+            arr.init_from_parent();
+            it->second.cow(arr, limit);
+        }
+    }
+}
+
 
 void Transaction::end_read()
 {

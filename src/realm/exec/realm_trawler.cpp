@@ -311,7 +311,7 @@ public:
         : Array(alloc, ref)
         , m_alloc(alloc)
     {
-        m_valid &= (size() <= 11);
+        m_valid &= (size() <= 12);
         if (valid()) {
             m_file_size = get_val(2);
             current_logical_file_size = m_file_size;
@@ -363,6 +363,10 @@ public:
     int get_file_ident() const
     {
         return int(get_val(10));
+    }
+    size_t get_evacuation_limit() const
+    {
+        return size_t(get_val(11));
     }
     unsigned get_nb_tables() const
     {
@@ -434,6 +438,10 @@ std::ostream& operator<<(std::ostream& ostr, const Group& g)
 {
     if (g.valid()) {
         ostr << "Logical file size: " << human_readable(g.get_file_size()) << std::endl;
+        if (g.size() > 11) {
+            if (auto limit = g.get_evacuation_limit())
+                ostr << "Evacuation limit: 0x" << std::hex << limit << std::dec << std::endl;
+        }
         if (g.size() > 6) {
             ostr << "Current version: " << g.get_current_version() << std::endl;
             ostr << "Free list size: " << g.m_free_list_positions.size() << std::endl;
@@ -747,7 +755,7 @@ void RealmFile::free_list_info() const
     auto end = free_list.end();
     while (it != end) {
         std::cout << "    0x" << std::hex << it->start << "..0x" << it->start + it->length << ", " << std::dec
-                  << it->version << std::endl;
+                  << it->length << ", " << it->version << std::endl;
         total_free_list_size += it->length;
         if (it->version != 0) {
             pinned_free_list_size += it->length;
