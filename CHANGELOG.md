@@ -22,6 +22,7 @@
 ### Internals
 * Delete everything related to the metered allocations feature used for server monitoring.
 * Support Nightly builds in Jenkins. ([#5626](https://github.com/realm/realm-core/issues/5626))
+* Add support for running the object store tests and some of the benchmarks on iOS.
 
 ----------------------------------------------
 
