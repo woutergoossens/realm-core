@@ -9,6 +9,7 @@
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fix a UBSan failure when mapping encrypted pages.
 * Improved performance of sync clients during integration of changesets with many small strings (totalling > 1024 bytes per changeset) on iOS 14, and devices which have restrictive or fragmented memory. ([#5614](https://github.com/realm/realm-core/issues/5614))
+* Fix some warnings when building with Xcode 14.
  
 ### Breaking changes
 * In Realm JS, the client reset callback can result in the fatal error `Realm accessed on incorrect thread`. Using a thread safe reference instead of Realm instance fixes the issue. (Issue [realm/realm-js#4410](https://github.com/realm/realm-js/issues/4410))
