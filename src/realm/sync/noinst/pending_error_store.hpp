@@ -30,7 +30,8 @@ public:
     PendingErrorStore(const PendingErrorStore&) = delete;
     PendingErrorStore& operator=(const PendingErrorStore&) = delete;
 
-    std::vector<ProtocolErrorInfo> peek_pending_errors(const TransactionRef& tr, sync::version_type before_server_version);
+    std::vector<ProtocolErrorInfo> peek_pending_errors(const TransactionRef& tr,
+                                                       sync::version_type before_server_version);
     void remove_pending_errors(sync::version_type before_server_version);
 
     void add_pending_error(const ProtocolErrorInfo& error_info);
@@ -54,7 +55,7 @@ private:
     ColKey m_max_resumption_delay_interval;
     ColKey m_resumption_delay_interval;
     ColKey m_resumption_delay_backoff_multiplier;
-    
+
     ColKey m_rejected_update_reason;
     ColKey m_rejected_update_pk;
     ColKey m_rejected_update_table;

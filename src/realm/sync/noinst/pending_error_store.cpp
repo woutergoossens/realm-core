@@ -185,7 +185,8 @@ void PendingErrorStore::add_pending_error(const ProtocolErrorInfo& error_info)
         new_obj.set(m_resumption_delay_interval, error_info.resumption_delay_info->resumption_delay_interval.count());
         new_obj.set(m_resumption_delay_backoff_multiplier,
                     error_info.resumption_delay_info->resumption_delay_backoff_multiplier);
-        new_obj.set(m_max_resumption_delay_interval, error_info.resumption_delay_info->max_resumption_delay_interval.count());
+        new_obj.set(m_max_resumption_delay_interval,
+                    error_info.resumption_delay_info->max_resumption_delay_interval.count());
     }
 
     auto rejected_updates = new_obj.get_linklist(m_rejected_updates);

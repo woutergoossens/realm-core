@@ -731,8 +731,7 @@ void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_
     if (!pending_errors.empty()) {
         std::vector<ProtocolErrorInfo> observed_pending_errors;
         std::set_intersection(pending_errors.begin(), pending_errors.end(), changesets.begin(), changesets.end(),
-                              std::back_inserter(observed_pending_errors),
-                              ChangesetProtocolErrorComparor{});
+                              std::back_inserter(observed_pending_errors), ChangesetProtocolErrorComparor{});
 
         for (const auto& error_info : observed_pending_errors) {
             SessionErrorInfo sess_err_info(error_info,
