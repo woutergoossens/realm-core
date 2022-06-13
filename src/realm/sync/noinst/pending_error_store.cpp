@@ -191,7 +191,8 @@ void PendingErrorStore::add_pending_error(const ProtocolErrorInfo& error_info)
 
     auto rejected_updates = new_obj.get_linklist(m_rejected_updates);
     for (const auto& rejected_update : error_info.compensating_writes) {
-        auto new_rejected_update_obj = rejected_updates.create_and_insert_linked_object(rejected_updates.size() - 1);
+        auto new_rejected_update_obj = rejected_updates.create_and_insert_linked_object(
+            rejected_updates.is_empty() ? 0 : rejected_updates.size() - 1);
         new_rejected_update_obj.set(m_rejected_update_table, rejected_update.object_name);
         new_rejected_update_obj.set(m_rejected_update_reason, rejected_update.reason);
         new_rejected_update_obj.set(m_rejected_update_pk, rejected_update.primary_key);
