@@ -63,8 +63,9 @@ cd realm-core
 git checkout $REALM_CORE_REVISION
 
 git submodule update --init --recursive
+mv /home/ubuntu/install_baas.sh evergreen/
 
-install_baas_flags="-w ./baas-work-dir -H $BAAS_HOST_NAME"
+install_baas_flags="-w ./baas-work-dir"
 if [[ -n "$BAAS_BRANCH" ]]; then
     install_baas_flags="$install_baas_flags -b $BAAS_BRANCH"
 fi

@@ -104,16 +104,14 @@ REALPATH="$BASE_PATH/abspath.sh"
 usage()
 {
     echo "Usage: install_baas.sh -w <path to working dir>
-                       [-b <branch or git spec of baas to checkout/build]
-                       [-h <hostname baas should listen on]"
+                       [-b <branch or git spec of baas to checkout/build]"
     exit 0
 }
 
-PASSED_ARGUMENTS=$(getopt w:b:H: "$*") || usage
+PASSED_ARGUMENTS=$(getopt w:b: "$*") || usage
 
 WORK_PATH=""
 BAAS_VERSION=""
-HOSTNAME_OVERRIDE=""
 
 set -- $PASSED_ARGUMENTS
 while :
@@ -121,7 +119,6 @@ do
     case "$1" in
         -w) WORK_PATH=$($REALPATH "$2"); shift; shift;;
         -b) BAAS_VERSION="$2"; shift; shift;;
-        -H) HOSTNAME_OVERRIDE="$2"; shift; shift;;
         --) shift; break;;
         *) echo "Unexpected option $1"; usage;;
     esac
@@ -316,16 +313,9 @@ echo "Building stitch app server"
 go build -o "$WORK_PATH/baas_server" cmd/server/main.go
 
 echo "Starting stitch app server"
-cp etc/configs/test_config.json $WORK_PATH/baas_config.json
-
-if [[ -n "$HOSTNAME_OVERRIDE" ]]; then
-    sed -i "s/localhost/$HOSTNAME_OVERRIDE/g" $WORK_PATH/baas_config.json
-fi
-
-diff -u etc/configs/test_config.json $WORK_PATH/baas_config.json
 
 "$WORK_PATH/baas_server" \
-    --configFile=$WORK_PATH/baas_config.json --configFile="$BASE_PATH"/config_overrides.json 2>&1 > "$WORK_PATH/baas_server.log" &
+    --configFile=etc/configs/test_config.json --configFile="$BASE_PATH"/config_overrides.json 2>&1 > "$WORK_PATH/baas_server.log" &
 echo $! > "$WORK_PATH/baas_server.pid"
 "$BASE_PATH"/wait_for_baas.sh "$WORK_PATH/baas_server.pid" 120 "$WORK_PATH/baas_server.log"
 

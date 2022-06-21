@@ -1,13 +1,22 @@
 #!/bin/bash
 set -o verbose
+set -o xtrace
 
+trap 'catch $? $LINENO' EXIT
+catch() {
+  echo "local baas setup wrapper exiting"
+  if [ "$1" != "0" ]; then
+    echo "Error $1 occurred while starting baas (local) on $2"
+  fi
+}
 export BAAS_HOST_NAME=$(tr -d '"[]{}' < baas_host.yml | cut -d , -f 1 | awk -F : '{print $2}')
 ssh_user="$(printf "ubuntu@%s" "$BAAS_HOST_NAME")"
 
 ssh-agent > ssh_agent_commands.sh
 source ssh_agent_commands.sh
 ssh-add ~/.ssh/id_rsa
-ssh_options="-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=No -o ConnectTimeout=10 -i .baas_ssh_key -L 9090:localhost:9090"
+ssh-add .baas_ssh_key
+ssh_options="-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=No -o ConnectTimeout=10 -i .baas_ssh_key"
 
 attempts=0
 connection_attempts=20
@@ -27,20 +36,8 @@ done
 echo "Scp-ing setup script to $ssh_user:/data"
 scp $ssh_options baas_host_vars.sh $ssh_user:/home/ubuntu || exit 1
 scp $ssh_options evergreen/setup_baas_host.sh $ssh_user:/home/ubuntu || exit 1
+scp $ssh_options evergreen/install_baas.sh $ssh_user:/home/ubuntu || exit 1
 
 echo "Running setup script"
-nohup ssh $ssh_options $ssh_user "/home/ubuntu/setup_baas_host.sh -a /home/ubuntu/baas_host_vars.sh -x" &
+ssh $ssh_options  -L 9090:127.0.0.1:9090 $ssh_user "/home/ubuntu/setup_baas_host.sh -a /home/ubuntu/baas_host_vars.sh -x"
 
-RETRY_COUNT=180
-WAIT_COUNTER=0
-
-until curl --output /dev/null --head --fail http://localhost:9090 --silent ; do
-  if [[ $WAIT_COUNTER -ge $RETRY_COUNT ]]; then
-    echo "Timed out waiting for baas to start"
-    exit 1
-  fi
-
-  ((WAIT_COUNTER++))
-  [[ -f nohup.out ]] && tail nohup.out
-  sleep 5
-done
