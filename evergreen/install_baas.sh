@@ -104,14 +104,16 @@ REALPATH="$BASE_PATH/abspath.sh"
 usage()
 {
     echo "Usage: install_baas.sh -w <path to working dir>
-                       [-b <branch or git spec of baas to checkout/build]"
+                       [-b <branch or git spec of baas to checkout/build]
+                       [-h <hostname baas should listen on]"
     exit 0
 }
 
-PASSED_ARGUMENTS=$(getopt w:s:b: "$*") || usage
+PASSED_ARGUMENTS=$(getopt w:b:H: "$*") || usage
 
 WORK_PATH=""
 BAAS_VERSION=""
+HOSTNAME_OVERRIDE=""
 
 set -- $PASSED_ARGUMENTS
 while :
@@ -119,6 +121,7 @@ do
     case "$1" in
         -w) WORK_PATH=$($REALPATH "$2"); shift; shift;;
         -b) BAAS_VERSION="$2"; shift; shift;;
+        -H) HOSTNAME_OVERRIDE="$2"; shift; shift;;
         --) shift; break;;
         *) echo "Unexpected option $1"; usage;;
     esac
@@ -308,13 +311,23 @@ go run -exec="env LD_LIBRARY_PATH=$LD_LIBRARY_PATH DYLD_LIBRARY_PATH=$DYLD_LIBRA
     -password "password"
 
 [[ -d tmp ]] || mkdir tmp
-echo "Starting stitch app server"
+echo "Building stitch app server"
 [[ -f $WORK_PATH/baas_server.pid ]] && rm "$WORK_PATH/baas_server.pid"
 go build -o "$WORK_PATH/baas_server" cmd/server/main.go
+
+echo "Starting stitch app server"
+cp etc/configs/test_config.json $WORK_PATH/baas_config.json
+
+if [[ -n "$HOSTNAME_OVERRIDE" ]]; then
+    sed -i "s/localhost/$HOSTNAME_OVERRIDE/g" $WORK_PATH/baas_config.json
+fi
+
+diff -u etc/configs/test_config.json $WORK_PATH/baas_config.json
+
 "$WORK_PATH/baas_server" \
-    --configFile=etc/configs/test_config.json --configFile="$BASE_PATH"/config_overrides.json 2>&1 > "$WORK_PATH/baas_server.log" &
+    --configFile=$WORK_PATH/baas_config.json --configFile="$BASE_PATH"/config_overrides.json 2>&1 > "$WORK_PATH/baas_server.log" &
 echo $! > "$WORK_PATH/baas_server.pid"
-"$BASE_PATH"/wait_for_baas.sh "$WORK_PATH/baas_server.pid"
+"$BASE_PATH"/wait_for_baas.sh "$WORK_PATH/baas_server.pid" 120 "$WORK_PATH/baas_server.log"
 
 touch "$WORK_PATH/baas_ready"
 
