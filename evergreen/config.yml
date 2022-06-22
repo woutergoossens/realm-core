@@ -670,7 +670,7 @@ tasks:
       shell: bash
       script: |-
         #!/bin/bash
-        if [[ ! -f baas_host.yml || -! -f .baas_ssh_key ]]; then
+        if [[ ! -f baas_host.yml || ! -f .baas_ssh_key ]]; then
           echo "No baas host definition or ssh key found"
           exit
         fi
@@ -681,7 +681,7 @@ tasks:
         ssh_options="-o ForwardAgent=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=No -o ConnectTimeout=10 -i .baas_ssh_key"
 
         mkdir baas-work-dir
-        scp $ssh_options $ssh_user:/data/baas-work-dir/baas_server.log ./baas-work-dir/baas_server.log
+        scp $ssh_options $ssh_user:/data/realm-core/baas-work-dir/baas_server.log ./baas-work-dir/baas_server.log
 
 - name: lint
   commands:
