@@ -612,7 +612,7 @@ tasks:
 - name: object-store-tests
   display_name: object-store-tests
   tags: [  "for_pull_requests" ]
-  exec_timeout_secs: 1800
+  exec_timeout_secs: 3600
   commands:
   - func: "compile"
     vars:
@@ -661,7 +661,7 @@ tasks:
 - name: object-store-tests-remote-baas
   display_name: object-store-tests
   tags: [ "for_pull_requests" ]
-  exec_timeout_secs: 2000
+  exec_timeout_secs: 3600 
   commands:
   - func: "launch baas host"
   - func: "compile"
